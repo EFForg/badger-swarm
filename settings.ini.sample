@@ -1,0 +1,10 @@
+[Digital Ocean settings]
+do_region=sfo1
+do_image=ubuntu-20-04-x64
+do_size=s-2vcpu-4gb
+do_ssh_key=
+#droplet_name_prefix=YOUR_NAME-badger-scanner-
+
+[crawl settings]
+browser=chrome
+#tlds_to_exclude=mil,gov
