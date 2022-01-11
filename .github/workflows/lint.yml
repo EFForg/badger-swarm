@@ -1,0 +1,16 @@
+on: [push, pull_request, workflow_dispatch]
+
+name: CI
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      - name: ShellCheck
+        uses: ludeeus/action-shellcheck@1.1.0
+        with:
+          scandir: .
