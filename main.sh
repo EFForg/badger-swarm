@@ -148,7 +148,7 @@ get_droplet_ip() {
   cat "$ip_file"
 }
 
-ssh_with_opts() {
+ssh_fn() {
   local retry=true
   if [ "$1" = noretry ]; then
     retry=false
@@ -167,11 +167,13 @@ ssh_with_opts() {
   return $ret
 }
 
-scp_with_opts() {
+rsync_fn() {
+  declare -i num=1 max_tries=5
   local ret
-  set -- -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes "$@"
-  while scp "$@"; ret=$?; [ $ret -eq 255 ]; do
-    err "Waiting to retry SCP: $*"
+  set -- -q -e 'ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes' "$@"
+  while rsync "$@"; ret=$?; [ $ret -ne 0 ] && [ "$num" -lt "$max_tries" ]; do
+    num=$((num + 1))
+    err "Waiting to retry rsync: $*"
     sleep 10
   done
   return $ret
@@ -185,7 +187,7 @@ wait_for_cloudinit() {
   # TODO actually detect when that happens
   sleep 10
 
-  while ssh_with_opts root@"$droplet_ip" 'pgrep cloud-init >/dev/null'; do
+  while ssh_fn root@"$droplet_ip" 'pgrep cloud-init >/dev/null'; do
     echo "Waiting for cloud-init to complete on $droplet ($droplet_ip) ..."
     sleep 10
   done
@@ -197,8 +199,8 @@ install_dependencies() {
   local aptget_with_opts='DEBIAN_FRONTEND=noninteractive apt-get -qq -o DPkg::Lock::Timeout=60 -o Dpkg::Use-Pty=0'
 
   echo "Installing dependencies on $droplet ($droplet_ip) ..."
-  ssh_with_opts root@"$droplet_ip" "$aptget_with_opts update >/dev/null 2>&1"
-  ssh_with_opts root@"$droplet_ip" "$aptget_with_opts install docker.io >/dev/null 2>&1"
+  ssh_fn root@"$droplet_ip" "$aptget_with_opts update >/dev/null 2>&1"
+  ssh_fn root@"$droplet_ip" "$aptget_with_opts install docker.io >/dev/null 2>&1"
 }
 
 init_scan() {
@@ -216,16 +218,16 @@ init_scan() {
   install_dependencies "$droplet" "$droplet_ip"
 
   # create non-root user
-  ssh_with_opts root@"$droplet_ip" 'useradd -m crawluser && usermod -aG docker crawluser && cp -r /root/.ssh /home/crawluser/ && chown -R crawluser:crawluser /home/crawluser/.ssh'
+  ssh_fn root@"$droplet_ip" 'useradd -m crawluser && usermod -aG docker crawluser && cp -r /root/.ssh /home/crawluser/ && chown -R crawluser:crawluser /home/crawluser/.ssh'
 
   # check out Badger Sett
-  ssh_with_opts crawluser@"$droplet_ip" 'git clone -q --depth 1 https://github.com/EFForg/badger-sett.git'
+  ssh_fn crawluser@"$droplet_ip" 'git clone -q --depth 1 https://github.com/EFForg/badger-sett.git'
 
   # remove previous scan results to avoid any potential confusion
-  ssh_with_opts crawluser@"$droplet_ip" 'rm badger-sett/results.json badger-sett/log.txt'
+  ssh_fn crawluser@"$droplet_ip" 'rm badger-sett/results.json badger-sett/log.txt'
 
   # copy domain list
-  scp_with_opts "$domains_chunk" crawluser@"$droplet_ip":badger-sett/domain-lists/domains.txt
+  rsync_fn "$domains_chunk" crawluser@"$droplet_ip":badger-sett/domain-lists/domains.txt
 
   echo "Starting scan on $droplet ($droplet_ip) ..."
   chunk_size=$(wc -l < ./"$domains_chunk")
@@ -233,18 +235,18 @@ init_scan() {
     exclude="--exclude=$exclude"
   fi
   # TODO support configuring --load-extension
-  ssh_with_opts crawluser@"$droplet_ip" "BROWSER=$browser GIT_PUSH=0 RUN_BY_CRON=1 nohup ./badger-sett/runscan.sh --n-sites $chunk_size --domain-list ./domain-lists/domains.txt $exclude </dev/null >runscan.out 2>&1 &"
+  ssh_fn crawluser@"$droplet_ip" "BROWSER=$browser GIT_PUSH=0 RUN_BY_CRON=1 nohup ./badger-sett/runscan.sh --n-sites $chunk_size --domain-list ./domain-lists/domains.txt $exclude </dev/null >runscan.out 2>&1 &"
 }
 
 wait_for_completion() {
   local droplet_ip="$1"
   local scan_result
 
-  while ssh_with_opts crawluser@"$droplet_ip" '[ -d ./badger-sett/.scan_in_progress ]' 2>/dev/null; do
+  while ssh_fn crawluser@"$droplet_ip" '[ -d ./badger-sett/.scan_in_progress ]' 2>/dev/null; do
     sleep 60
   done
 
-  scan_result=$(ssh_with_opts crawluser@"$droplet_ip" "tail -n1 runscan.out" 2>/dev/null)
+  scan_result=$(ssh_fn crawluser@"$droplet_ip" "tail -n1 runscan.out" 2>/dev/null)
 
   # successful scan
   [ "${scan_result:0:16}" = "Scan successful." ] && return 0
@@ -258,27 +260,33 @@ manage_scan() {
   local domains_chunk="$2"
 
   local chunk=${domains_chunk##*.}
+  local copy_err=false
   local droplet_ip
   droplet_ip=$(get_droplet_ip "$droplet")
 
   if wait_for_completion "$droplet_ip"; then
     echo "Completed scan on $droplet ($droplet_ip)"
-    # extract results and log file
-    # TODO retry all these SCP commands with a limit
-    # TODO and if we fail to extract, do not delete the droplet
-    scp_with_opts crawluser@"$droplet_ip":badger-sett/results.json "$results_folder"/results."$chunk".json || err "Failed to extract results.${chunk}.json"
-    scp_with_opts crawluser@"$droplet_ip":badger-sett/log.txt "$results_folder"/log."$chunk".txt || err "Failed to extract log.${chunk}.txt"
+    # extract results
+    rsync_fn crawluser@"$droplet_ip":badger-sett/results.json "$results_folder"/results."$chunk".json || copy_err=$?
   else
-    # TODO retry
+    # TODO retry scan
     echo "Failed scan on $droplet ($droplet_ip)"
-    # extract log files
-    scp_with_opts crawluser@"$droplet_ip":runscan.out "$results_folder"/erroredscan."$chunk".out || err "Failed to extract erroredscan.${chunk}.out"
-    # TODO we could fail where there is no log.txt to extract
-    scp_with_opts crawluser@"$droplet_ip":badger-sett/log.txt "$results_folder"/log."$chunk".txt || err "Failed to extract log.${chunk}.txt"
+    # extract Docker output log
+    rsync_fn crawluser@"$droplet_ip":runscan.out "$results_folder"/erroredscan."$chunk".out || copy_err=$?
   fi
 
-  echo "Deleting $droplet"
-  doctl compute droplet delete -f "$droplet"
+  # extract Badger Sett log
+  if ! rsync_fn crawluser@"$droplet_ip":badger-sett/log.txt "$results_folder"/log."$chunk".txt; then
+    copy_err=$?
+    echo "rsync failed with exit value: $copy_err" > "$results_folder"/log."$chunk".txt
+  fi
+
+  if [ "$copy_err" = false ]; then
+    echo "Deleting $droplet"
+    doctl compute droplet delete -f "$droplet"
+  else
+    err "Failed to extract one or more files from $droplet"
+  fi
   rm -f "$results_folder"/"$droplet".ip "$results_folder"/"$droplet".status
 }
 
@@ -301,7 +309,7 @@ update_droplet_status() {
 
   droplet_ip=$(get_droplet_ip "$droplet")
 
-  num_visited=$(ssh_with_opts noretry crawluser@"$droplet_ip" 'if [ -f ./badger-sett/docker-out/log.txt ]; then grep -E "Visiting [0-9]+:" ./badger-sett/docker-out/log.txt | tail -n1 | sed "s/.*Visiting \([0-9]\+\):.*/\1/"; fi' 2>/dev/null)
+  num_visited=$(ssh_fn noretry crawluser@"$droplet_ip" 'if [ -f ./badger-sett/docker-out/log.txt ]; then grep -E "Visiting [0-9]+:" ./badger-sett/docker-out/log.txt | tail -n1 | sed "s/.*Visiting \([0-9]\+\):.*/\1/"; fi' 2>/dev/null)
 
   if [ $? -eq 255 ]; then
     echo "SSH error"
@@ -363,14 +371,12 @@ show_progress() {
       echo -ne '\r\033[K' # first erase previous output
 
       if [ -f "$results_folder"/erroredscan."$chunk".out ]; then
-        # TODO retry
         echo "$droplet failed"
         continue
       elif [ -f "$results_folder"/results."$chunk".json ]; then
         echo "$droplet finished"
         continue
       elif [ -f "$results_folder"/log."$chunk".txt ]; then
-        # TODO we can get into a situation where we have a log.txt (that seems to have finished) but we don't have results.json! probably because scp failed for some reason ... is network retrying code not working? should at least detect scp failure and not delete the droplet
         echo "$droplet ??? (see $results_folder/log.${chunk}.txt)"
         continue
       fi
