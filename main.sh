@@ -86,6 +86,18 @@ parse_config() {
   fi
 }
 
+confirm_scan() {
+  local sites
+  sites=$(numfmt --to=si "$num_sites")
+  echo "Starting $sites site scan with ${browser^} in $do_region with $num_crawlers $do_size Droplets"
+  read -p "Continue (y/n)? " -n 1 -r
+  echo
+  if [ "$REPLY" = y ] || [ "$REPLY" = Y ]; then
+    return
+  fi
+  exit 0
+}
+
 grep_filter() {
   local tlds_to_exclude="$1"
   local tld
@@ -445,6 +457,9 @@ main() {
     results_folder=$(cat output/.run_in_progress)
     echo "Resuming scan in $results_folder"
   else
+    # confirm before starting
+    confirm_scan
+
     results_folder="output/$(numfmt --to=si "$num_sites")-${num_crawlers}-${browser}-${do_size}-$(date +"%s")"
     echo "Creating $results_folder"
     mkdir -p "$results_folder"
