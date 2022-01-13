@@ -12,13 +12,13 @@ parse_args() {
     case "$flag" in
       n) num_crawlers="$OPTARG" ;;
       s) num_sites="$OPTARG" ;;
-      r) resume_scan=true ;;
+      r) resume_run=true ;;
       *) err "$usage"; exit 1 ;;
     esac
   done
 
   # TODO restore num_crawlers and num_sites automatically when -r is present
-  if [ "$resume_scan" = true ]; then
+  if [ "$resume_run" = true ]; then
     if [ ! -f output/.run_in_progress ]; then
       err "No in-progress run found"
       exit 1
@@ -39,7 +39,7 @@ parse_args() {
     exit 1
   fi
 
-  if [ "$resume_scan" = false ]; then
+  if [ "$resume_run" = false ]; then
     if [ -f output/.run_in_progress ]; then
       err "In-progress run found: $(cat output/.run_in_progress)"
       err "Either resume with the -r flag or delete output/.run_in_progress"
@@ -86,10 +86,10 @@ parse_config() {
   fi
 }
 
-confirm_scan() {
+confirm_run() {
   local sites
   sites=$(numfmt --to=si "$num_sites")
-  echo "Starting $sites site scan with ${browser^} in $do_region with $num_crawlers $do_size Droplets"
+  echo "Starting $sites site run with ${browser^} in $do_region with $num_crawlers $do_size Droplets"
   read -p "Continue (y/n)? " -n 1 -r
   echo
   if [ "$REPLY" = y ] || [ "$REPLY" = Y ]; then
@@ -435,7 +435,7 @@ merge_results() {
 
 main() {
   # cli args
-  local num_crawlers num_sites resume_scan=false
+  local num_crawlers num_sites resume_run=false
 
   # settings.ini settings with default values
   local browser=chrome
@@ -453,12 +453,12 @@ main() {
   parse_args "$@"
   parse_config
 
-  if [ "$resume_scan" = true ]; then
+  if [ "$resume_run" = true ]; then
     results_folder=$(cat output/.run_in_progress)
-    echo "Resuming scan in $results_folder"
+    echo "Resuming run in $results_folder"
   else
     # confirm before starting
-    confirm_scan
+    confirm_run
 
     results_folder="output/$(numfmt --to=si "$num_sites")-${num_crawlers}-${browser}-${do_size}-$(date +"%s")"
     echo "Creating $results_folder"
