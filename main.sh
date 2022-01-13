@@ -20,7 +20,7 @@ parse_args() {
   # TODO restore num_crawlers and num_sites automatically when -r is present
   if [ "$resume_scan" = true ]; then
     if [ ! -f output/.run_in_progress ]; then
-      err "No in-progress run found ..."
+      err "No in-progress run found"
       exit 1
     fi
   fi
@@ -37,6 +37,14 @@ parse_args() {
   if [ "$num_sites" -lt 1 ] || [ "$num_sites" -gt 1000000 ]; then
     err "NUM_SITES must be > 0 and <= 1,000,000"
     exit 1
+  fi
+
+  if [ "$resume_scan" = false ]; then
+    if [ -f output/.run_in_progress ]; then
+      err "In-progress run found: $(cat output/.run_in_progress)"
+      err "Either resume with the -r flag or delete output/.run_in_progress"
+      exit 1
+    fi
   fi
 
   readonly num_crawlers num_sites
