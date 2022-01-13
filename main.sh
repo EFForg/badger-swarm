@@ -500,7 +500,7 @@ main() {
   sleep 10
   if doctl compute droplet list --format Name | grep -q "$droplet_name_prefix"; then
     err "WARNING: Not all Droplets deleted?"
-    err "Check with smth. like 'doctl compute droplet list --format Name,Status'"
+    err "Check with 'doctl compute droplet list --format ID,Name,PublicIPv4,Status'"
   fi
 
   echo "Merging results ..."
