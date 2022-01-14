@@ -30,10 +30,13 @@ parse_args() {
 }
 
 parse_config() {
+  local settings_file="$1"
   local name value
 
-  if [ ! -f settings.ini ]; then
-    err "Missing settings.ini"
+  settings_file=${settings_file:-"settings.ini"}
+
+  if [ ! -f "$settings_file" ]; then
+    err "Missing $settings_file"
     exit 1
   fi
 
@@ -42,7 +45,7 @@ parse_config() {
     [ "${name:0:1}" = "#" ] || [ "${name:0:1}" = "[" ] || [ -z "$name" ] && continue
 
     if [ -z "$value" ]; then
-      err "Missing settings.ini value for $name"
+      err "Missing $settings_file value for $name"
       exit 1
     fi
 
@@ -56,13 +59,13 @@ parse_config() {
       num_crawlers) readonly num_crawlers="$value" ;;
       num_sites) readonly num_sites="$value" ;;
       tlds_to_exclude) readonly tlds_to_exclude="$value" ;;
-      *) err "Unknown settings.ini setting: $name"; exit 1 ;;
+      *) err "Unknown $settings_file setting: $name"; exit 1 ;;
     esac
-  done < settings.ini
+  done < "$settings_file"
 
   # do_ssh_key must be provided as it's required and there is no default
   if [ -z "$do_ssh_key" ]; then
-    err "Missing settings.ini setting: do_ssh_key"
+    err "Missing $settings_file setting: do_ssh_key"
     exit 1
   fi
 
@@ -452,13 +455,14 @@ main() {
   local results_folder
 
   parse_args "$@"
-  parse_config
 
   if [ "$resume_run" = true ]; then
     results_folder=$(cat output/.run_in_progress)
     echo "Resuming run in $results_folder"
-    # TODO restore run params from run_settings.ini
+    parse_config "$results_folder"/run_settings.ini
   else
+    parse_config
+
     # confirm before starting
     confirm_run
 
