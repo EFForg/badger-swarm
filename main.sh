@@ -6,48 +6,27 @@ err() {
 
 parse_args() {
   local OPTIND
-  local usage="Usage: $0 -n NUM_CRAWLERS -s NUM_SITES [-r]"
+  local usage="Usage: $0 [-r]"
 
-  while getopts 'n:s:r' flag; do
+  while getopts 'r' flag; do
     case "$flag" in
-      n) num_crawlers="$OPTARG" ;;
-      s) num_sites="$OPTARG" ;;
       r) resume_run=true ;;
       *) err "$usage"; exit 1 ;;
     esac
   done
 
-  # TODO restore num_crawlers and num_sites automatically when -r is present
   if [ "$resume_run" = true ]; then
     if [ ! -f output/.run_in_progress ]; then
       err "No in-progress run found"
       exit 1
     fi
-  fi
-
-  if [ -z "$num_sites" ] || [ -z "$num_crawlers" ]; then
-    err "$usage"
-    exit 1
-  fi
-
-  if [ "$num_crawlers" -lt 1 ] || [ "$num_crawlers" -gt 100 ]; then
-    err "NUM_CRAWLERS must be > 0 and <= 100"
-    exit 1
-  fi
-  if [ "$num_sites" -lt 1 ] || [ "$num_sites" -gt 1000000 ]; then
-    err "NUM_SITES must be > 0 and <= 1,000,000"
-    exit 1
-  fi
-
-  if [ "$resume_run" = false ]; then
+  else
     if [ -f output/.run_in_progress ]; then
       err "In-progress run found: $(cat output/.run_in_progress)"
       err "Either resume with the -r flag or delete output/.run_in_progress"
       exit 1
     fi
   fi
-
-  readonly num_crawlers num_sites
 }
 
 parse_config() {
@@ -74,6 +53,8 @@ parse_config() {
       do_size) readonly do_size="$value" ;;
       do_ssh_key) readonly do_ssh_key="$value" ;;
       droplet_name_prefix) readonly droplet_name_prefix="$value" ;;
+      num_crawlers) readonly num_crawlers="$value" ;;
+      num_sites) readonly num_sites="$value" ;;
       tlds_to_exclude) readonly tlds_to_exclude="$value" ;;
       *) err "Unknown settings.ini setting: $name"; exit 1 ;;
     esac
@@ -82,6 +63,16 @@ parse_config() {
   # do_ssh_key must be provided as it's required and there is no default
   if [ -z "$do_ssh_key" ]; then
     err "Missing settings.ini setting: do_ssh_key"
+    exit 1
+  fi
+
+  if [ "$num_crawlers" -lt 1 ] || [ "$num_crawlers" -gt 100 ]; then
+    err "num_crawlers must be > 0 and <= 100"
+    exit 1
+  fi
+
+  if [ "$num_sites" -lt 1 ] || [ "$num_sites" -gt 1000000 ]; then
+    err "num_sites must be > 0 and <= 1,000,000"
     exit 1
   fi
 }
@@ -445,7 +436,7 @@ merge_results() {
 
 main() {
   # cli args
-  local num_crawlers num_sites resume_run=false
+  local resume_run=false
 
   # settings.ini settings with default values
   local browser=chrome
@@ -454,7 +445,7 @@ main() {
   local do_size=s-1vcpu-1gb
   local do_ssh_key=
   local droplet_name_prefix=badger-sett-scanner-
-  local tlds_to_exclude=
+  local num_crawlers num_sites tlds_to_exclude
 
   # loop vars and misc.
   local domains_chunk droplet
@@ -466,6 +457,7 @@ main() {
   if [ "$resume_run" = true ]; then
     results_folder=$(cat output/.run_in_progress)
     echo "Resuming run in $results_folder"
+    # TODO restore run params from run_settings.ini
   else
     # confirm before starting
     confirm_run
@@ -473,6 +465,9 @@ main() {
     results_folder="output/$(numfmt --to=si "$num_sites")-${num_crawlers}-${browser}-${do_size}-$(date +"%s")"
     echo "Creating $results_folder"
     mkdir -p "$results_folder"
+
+    # save run params
+    cp settings.ini "$results_folder"/run_settings.ini
 
     init_sitelists
 
