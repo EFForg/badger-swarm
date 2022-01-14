@@ -328,25 +328,35 @@ print_progress() {
 update_droplet_status() {
   local droplet="$1"
   local domains_chunk="$2"
+  local chunk=${domains_chunk##*.}
   local droplet_ip num_visited chunk_size
 
   droplet_ip=$(get_droplet_ip "$droplet")
 
-  num_visited=$(ssh_fn noretry crawluser@"$droplet_ip" 'if [ -f ./badger-sett/docker-out/log.txt ]; then grep -E "Visiting [0-9]+:" ./badger-sett/docker-out/log.txt | tail -n1 | sed "s/.*Visiting \([0-9]\+\):.*/\1/"; fi' 2>/dev/null)
+  while true; do
+    # scan finished or errored
+    [ -f "$results_folder"/log."$chunk".txt ] && return
 
-  if [ $? -eq 255 ]; then
-    echo "SSH error"
-  elif [ -n "$num_visited" ]; then
-    # TODO detect and retry stalled scans
-    # TODO for example can try `pkill chrome` when browser = chrome
-    chunk_size=$(wc -l < ./"$domains_chunk")
-    print_progress "$num_visited" "$chunk_size"
-  else
+    num_visited=$(ssh_fn noretry crawluser@"$droplet_ip" 'if [ -f ./badger-sett/docker-out/log.txt ]; then grep -E "Visiting [0-9]+:" ./badger-sett/docker-out/log.txt | tail -n1 | sed "s/.*Visiting \([0-9]\+\):.*/\1/"; fi' 2>/dev/null)
+
+    if [ $? -eq 255 ]; then
+      echo "SSH error"
+      return
+    fi
+
+    if [ -n "$num_visited" ]; then
+      # TODO detect and retry stalled scans
+      # TODO for example can try `pkill chrome` when $browser = chrome
+      chunk_size=$(wc -l < ./"$domains_chunk")
+      print_progress "$num_visited" "$chunk_size"
+      return
+    fi
+
     # empty num_visited can happen in the beginning but also at the end,
-    # after docker-out/log.txt was moved but before .scan_in_progress removal
-    # TODO when we resume and a droplet is already finished, we still seem to go here for 30 secs ...
-    echo "waiting ..."
-  fi
+    # after docker-out/log.txt was moved but before it was extracted
+    # let's wait until either we have a local log.txt or num_visited gets populated
+    sleep 5
+  done
 }
 
 show_progress() {
@@ -372,7 +382,7 @@ show_progress() {
 
     wait
 
-    # move cursor back up
+    # move cursor back up if we're not showing progress for the first time
     if [ "$first_time" = false ]; then
       for domains_chunk in "$results_folder"/sitelist.split.*; do
         [ -f "$domains_chunk" ] || continue
@@ -486,6 +496,9 @@ main() {
     wait
     echo "$results_folder" > output/.run_in_progress
     echo "This run is now resumable (using the -r flag)"
+
+    # wait for the scans to get going (docker run takes a while)
+    sleep 90
   fi
 
   # poll for status and clean up when finished
