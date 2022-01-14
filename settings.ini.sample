@@ -1,10 +1,14 @@
 [Digital Ocean settings]
-do_region=sfo1
-do_image=ubuntu-20-04-x64
-do_size=s-2vcpu-4gb
-do_ssh_key=
+# please uncomment and edit the name prefix for Droplets
 #droplet_name_prefix=YOUR_NAME-badger-scanner-
+# do_ssh_key is required to run this script. see `doctl compute ssh-key`
+do_ssh_key=
+# see `doctl compute region list`
+do_region=sfo1
+# see `doctl compute size list`
+do_size=s-2vcpu-4gb
+do_image=ubuntu-20-04-x64
 
-[crawl settings]
+[Badger Sett settings]
 browser=chrome
-#tlds_to_exclude=mil,gov
+tlds_to_exclude=mil,gov
