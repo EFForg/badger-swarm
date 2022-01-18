@@ -486,8 +486,12 @@ main() {
     for domains_chunk in "$results_folder"/sitelist.split.*; do
       [ -f "$domains_chunk" ] || continue
       droplet="${droplet_name_prefix}${domains_chunk##*.}"
-      create_droplet "$droplet"
-      init_scan "$droplet" "$domains_chunk" "$tlds_to_exclude" &
+      if create_droplet "$droplet"; then
+        init_scan "$droplet" "$domains_chunk" "$tlds_to_exclude" &
+      else
+        err "Failed to create $droplet"
+        mv "$domains_chunk" "$results_folder"/NO_DROPLET."${domains_chunk##*.}"
+      fi
     done
 
     wait
