@@ -90,6 +90,8 @@ with ${browser^} in $do_region with $num_crawlers $do_size Droplets"
   time_estimate=$(echo "$num_sites / $num_crawlers / $speed" | bc -l)
 
   price=$(doctl compute size list --format Slug,PriceHourly | grep "$do_size " | awk '{print $2}')
+  [ -z "$price" ] && { err "Failed to look up Droplet prices. Is doctl authenticated?"; exit 1; }
+
   cost_estimate=$(echo "$num_sites * $price / $speed" | bc -l)
 
   printf "This will take ~%.0f hours and cost ~\$%.2f\n" "$time_estimate" "$cost_estimate"
