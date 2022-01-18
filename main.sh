@@ -200,20 +200,6 @@ rsync_fn() {
   return $ret
 }
 
-wait_for_cloudinit() {
-  local droplet="$1"
-  local droplet_ip="$2"
-
-  # wait for cloud-init to kick off
-  # TODO actually detect when that happens
-  sleep 10
-
-  while ssh_fn root@"$droplet_ip" 'pgrep cloud-init >/dev/null'; do
-    echo "Waiting for cloud-init to complete on $droplet ($droplet_ip) ..."
-    sleep 10
-  done
-}
-
 install_dependencies() {
   local droplet="$1"
   local droplet_ip="$2"
@@ -235,7 +221,11 @@ init_scan() {
 
   droplet_ip=$(get_droplet_ip "$droplet")
 
-  wait_for_cloudinit "$droplet" "$droplet_ip"
+  # wait for cloud-init to finish
+  # (discard stderr because we may have to retry SSH a few times
+  # as it might not yet be ready, but this isn't interesting)
+  ssh_fn root@"$droplet_ip" 'cloud-init status --wait >/dev/null' 2>/dev/null
+
   install_dependencies "$droplet" "$droplet_ip"
 
   # create non-root user
