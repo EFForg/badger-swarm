@@ -146,13 +146,8 @@ init_sitelists() {
 
 create_droplet() {
   local droplet="$1"
-  local region="$2"
-  local image="$3"
-  local size="$4"
-  local ssh_key="$5"
-
-  echo "Creating Droplet $droplet ($region $image $size)"
-  doctl compute droplet create "$droplet" --region "$region" --image "$image" --size "$size" --ssh-keys "$ssh_key" > /dev/null
+  echo "Creating Droplet $droplet ($do_region $do_image $do_size)"
+  doctl compute droplet create "$droplet" --region "$do_region" --image "$do_image" --size "$do_size" --ssh-keys "$do_ssh_key" > /dev/null
 }
 
 wait_for_active_status() {
@@ -491,7 +486,7 @@ main() {
     for domains_chunk in "$results_folder"/sitelist.split.*; do
       [ -f "$domains_chunk" ] || continue
       droplet="${droplet_name_prefix}${domains_chunk##*.}"
-      create_droplet "$droplet" "$do_region" "$do_image" "$do_size" "$do_ssh_key"
+      create_droplet "$droplet"
       init_scan "$droplet" "$domains_chunk" "$tlds_to_exclude" &
     done
 
