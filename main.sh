@@ -229,7 +229,7 @@ init_scan() {
   install_dependencies "$droplet" "$droplet_ip"
 
   # create non-root user
-  ssh_fn root@"$droplet_ip" 'useradd -m crawluser && usermod -aG docker crawluser && cp -r /root/.ssh /home/crawluser/ && chown -R crawluser:crawluser /home/crawluser/.ssh'
+  ssh_fn root@"$droplet_ip" 'useradd -m crawluser && cp -r /root/.ssh /home/crawluser/ && chown -R crawluser:crawluser /home/crawluser/.ssh && usermod -aG docker crawluser'
 
   # check out Badger Sett
   ssh_fn crawluser@"$droplet_ip" 'git clone -q --depth 1 https://github.com/EFForg/badger-sett.git'
