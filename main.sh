@@ -313,36 +313,54 @@ print_progress() {
 }
 
 update_droplet_status() {
-  local droplet="$1"
-  local domains_chunk="$2"
+  local domains_chunk="$1"
   local chunk=${domains_chunk##*.}
-  local droplet_ip num_visited chunk_size
+  local droplet="${droplet_name_prefix}${chunk}"
+  local status_file="$results_folder"/"$droplet".status
+  local droplet_ip num_visited chunk_size status
 
   droplet_ip=$(get_droplet_ip "$droplet")
 
   while true; do
-    # scan finished or errored
+    # skip finished and errored scans
     [ -f "$results_folder"/log."$chunk".txt ] && return
 
     num_visited=$(ssh_fn noretry crawluser@"$droplet_ip" 'if [ -f ./badger-sett/docker-out/log.txt ]; then grep -E "Visiting [0-9]+:" ./badger-sett/docker-out/log.txt | tail -n1 | sed "s/.*Visiting \([0-9]\+\):.*/\1/"; fi' 2>/dev/null)
 
     if [ $? -eq 255 ]; then
-      echo "SSH error"
-      return
+      # SSH error
+      sleep 5
+      continue
     fi
 
-    if [ -n "$num_visited" ]; then
-      # TODO detect and retry stalled scans
-      # TODO for example can try `pkill chrome` when $browser = chrome
-      chunk_size=$(wc -l < ./"$domains_chunk")
-      print_progress "$num_visited" "$chunk_size"
-      return
+    if [ -z "$num_visited" ]; then
+      # empty num_visited can happen in the beginning but also at the end,
+      # after docker-out/log.txt was moved but before it was extracted
+      # let's wait until we have a local log.txt, or num_visited gets populated
+      sleep 5
+      continue
     fi
 
-    # empty num_visited can happen in the beginning but also at the end,
-    # after docker-out/log.txt was moved but before it was extracted
-    # let's wait until either we have a local log.txt or num_visited gets populated
-    sleep 5
+    chunk_size=$(wc -l < ./"$domains_chunk")
+    status=$(print_progress "$num_visited" "$chunk_size")
+
+    # we got a new progress update
+    if [ "$status" != "$(cat "$status_file")" ]; then
+      echo "$status" > "$status_file"
+
+    # no change in progress and the status file is now stale
+    elif [ ! "$(find "$status_file" -newermt "15 minutes ago")" ]; then
+      echo "stalled" > "$status_file"
+
+      # force a restart by killing the browser
+      if [ "$browser" = chrome ]; then
+        ssh_fn crawluser@"$droplet_ip" 'pkill chrome'
+      elif [ "$browser" = firefox ]; then
+        ssh_fn crawluser@"$droplet_ip" 'pkill firefox-bin'
+      fi
+    fi
+
+    return
   done
 }
 
@@ -357,14 +375,10 @@ show_progress() {
     for domains_chunk in "$results_folder"/sitelist.split.*; do
       [ -f "$domains_chunk" ] || continue
 
-      chunk=${domains_chunk##*.}
+      # skip finished and errored scans
+      [ -f "$results_folder"/log."${domains_chunk##*.}".txt ] && continue
 
-      # skip finished or errored
-      [ -f "$results_folder"/log."$chunk".txt ] && continue
-
-      droplet="${droplet_name_prefix}${chunk}"
-
-      update_droplet_status "$droplet" "$domains_chunk" > "$results_folder"/"$droplet".status &
+      update_droplet_status "$domains_chunk" &
     done
 
     wait
@@ -496,7 +510,7 @@ main() {
   for domains_chunk in "$results_folder"/sitelist.split.*; do
     [ -f "$domains_chunk" ] || continue
 
-    # skip finished or errored
+    # skip finished and errored scans
     [ -f "$results_folder"/log."${domains_chunk##*.}".txt ] && continue
 
     droplet="${droplet_name_prefix}${domains_chunk##*.}"
