@@ -194,7 +194,7 @@ rsync_fn() {
   set -- -q -e 'ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes' "$@"
   while rsync "$@"; ret=$?; [ $ret -ne 0 ] && [ "$num" -lt "$max_tries" ]; do
     num=$((num + 1))
-    err "Waiting to retry rsync: $*"
+    err "Waiting to retry rsync (failed with $ret): $*"
     sleep 10
   done
   return $ret
@@ -278,18 +278,18 @@ manage_scan() {
   if wait_for_completion "$droplet_ip"; then
     echo "Completed scan on $droplet ($droplet_ip)"
     # extract results
-    rsync_fn crawluser@"$droplet_ip":badger-sett/results.json "$results_folder"/results."$chunk".json || copy_err=$?
+    rsync_fn crawluser@"$droplet_ip":badger-sett/results.json "$results_folder"/results."$chunk".json || copy_err=true
   else
     # TODO retry scan
     echo "Failed scan on $droplet ($droplet_ip)"
     # extract Docker output log
-    rsync_fn crawluser@"$droplet_ip":runscan.out "$results_folder"/erroredscan."$chunk".out || copy_err=$?
+    rsync_fn crawluser@"$droplet_ip":runscan.out "$results_folder"/erroredscan."$chunk".out || copy_err=true
   fi
 
   # extract Badger Sett log
   if ! rsync_fn crawluser@"$droplet_ip":badger-sett/log.txt "$results_folder"/log."$chunk".txt; then
-    copy_err=$?
-    echo "rsync failed with exit value: $copy_err" > "$results_folder"/log."$chunk".txt
+    copy_err=true
+    echo "failed to extract log.txt" > "$results_folder"/log."$chunk".txt
   fi
 
   if [ "$copy_err" = false ]; then
