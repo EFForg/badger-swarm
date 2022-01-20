@@ -249,13 +249,19 @@ init_scan() {
   ssh_fn crawluser@"$droplet_ip" "BROWSER=$browser GIT_PUSH=0 RUN_BY_CRON=1 nohup ./badger-sett/runscan.sh --n-sites $chunk_size --domain-list ./domain-lists/domains.txt $exclude </dev/null >runscan.out 2>&1 &"
 }
 
-wait_for_completion() {
+scan_terminated() {
+  local droplet_ip="$1"
+
+  if ssh_fn crawluser@"$droplet_ip" '[ ! -d ./badger-sett/.scan_in_progress ]' 2>/dev/null; then
+    return 0
+  fi
+
+  return 1
+}
+
+scan_succeeded() {
   local droplet_ip="$1"
   local scan_result
-
-  while ssh_fn crawluser@"$droplet_ip" '[ -d ./badger-sett/.scan_in_progress ]' 2>/dev/null; do
-    sleep 60
-  done
 
   scan_result=$(ssh_fn crawluser@"$droplet_ip" "tail -n1 runscan.out" 2>/dev/null)
 
@@ -266,22 +272,18 @@ wait_for_completion() {
   return 1
 }
 
-manage_scan() {
+extract_results() {
   local droplet="$1"
-  local domains_chunk="$2"
+  local droplet_ip="$2"
+  local chunk="$3"
 
-  local chunk=${domains_chunk##*.}
   local copy_err=false
-  local droplet_ip
-  droplet_ip=$(get_droplet_ip "$droplet")
 
-  if wait_for_completion "$droplet_ip"; then
-    echo "Completed scan on $droplet ($droplet_ip)"
+  if scan_succeeded "$droplet_ip"; then
     # extract results
     rsync_fn crawluser@"$droplet_ip":badger-sett/results.json "$results_folder"/results."$chunk".json || copy_err=true
   else
     # TODO retry scan
-    echo "Failed scan on $droplet ($droplet_ip)"
     # extract Docker output log
     rsync_fn crawluser@"$droplet_ip":runscan.out "$results_folder"/erroredscan."$chunk".out || copy_err=true
   fi
@@ -293,7 +295,6 @@ manage_scan() {
   fi
 
   if [ "$copy_err" = false ]; then
-    echo "Deleting $droplet"
     doctl compute droplet delete -f "$droplet"
   else
     err "Failed to extract one or more files from $droplet"
@@ -336,16 +337,22 @@ update_droplet_status() {
     if [ -z "$num_visited" ]; then
       # empty num_visited can happen in the beginning but also at the end,
       # after docker-out/log.txt was moved but before it was extracted
-      # let's wait until we have a local log.txt, or num_visited gets populated
-      sleep 5
-      continue
+
+      if scan_terminated "$droplet_ip"; then
+        extract_results "$droplet" "$droplet_ip" "$chunk"
+        return
+      else
+        # wait until we detect scan termination, or num_visited gets populated
+        sleep 5
+        continue
+      fi
     fi
 
     chunk_size=$(wc -l < ./"$domains_chunk")
     status=$(print_progress "$num_visited" "$chunk_size")
 
     # we got a new progress update
-    if [ "$status" != "$(cat "$status_file")" ]; then
+    if [ ! -f "$status_file" ] || [ "$status" != "$(cat "$status_file")" ]; then
       echo "$status" > "$status_file"
 
     # no change in progress and the status file is now stale
@@ -364,7 +371,7 @@ update_droplet_status() {
   done
 }
 
-show_progress() {
+manage_scans() {
   local all_done domains_chunk chunk droplet
   local first_time=true
 
@@ -506,21 +513,9 @@ main() {
     sleep 90
   fi
 
-  # poll for status and clean up when finished
-  for domains_chunk in "$results_folder"/sitelist.split.*; do
-    [ -f "$domains_chunk" ] || continue
+  # periodically poll for status, print progress, and clean up when finished
+  manage_scans
 
-    # skip finished and errored scans
-    [ -f "$results_folder"/log."${domains_chunk##*.}".txt ] && continue
-
-    droplet="${droplet_name_prefix}${domains_chunk##*.}"
-    manage_scan "$droplet" "$domains_chunk" >/dev/null &
-  done
-
-  # periodically print progress updates
-  show_progress &
-
-  wait
   echo "All scans finished"
   rm output/.run_in_progress
 
