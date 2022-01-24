@@ -163,9 +163,16 @@ wait_for_active_status() {
 get_droplet_ip() {
   local droplet="$1"
   local ip_file="$results_folder"/"$droplet".ip
+  local ip
+
   if [ ! -f "$ip_file" ]; then
-    doctl compute droplet get "$droplet" --template "{{.PublicIPv4}}" > "$ip_file"
+    while [ -z "$ip" ]; do
+      ip=$(doctl compute droplet get "$droplet" --template "{{.PublicIPv4}}" 2>/dev/null)
+      [ -z "$ip" ] && sleep 5
+    done
+    echo "$ip" > "$ip_file"
   fi
+
   cat "$ip_file"
 }
 
@@ -283,7 +290,6 @@ extract_results() {
     # extract results
     rsync_fn crawluser@"$droplet_ip":badger-sett/results.json "$results_folder"/results."$chunk".json || copy_err=true
   else
-    # TODO retry scan
     # extract Docker output log
     rsync_fn crawluser@"$droplet_ip":runscan.out "$results_folder"/erroredscan."$chunk".out || copy_err=true
   fi
@@ -313,18 +319,29 @@ print_progress() {
   printf "[${bar_fill// /#}${bar_empty}] %*s  $pct%%\n" $((${#total} * 2 + 2)) "$1/$2"
 }
 
-update_droplet_status() {
+manage_scan() {
   local domains_chunk="$1"
   local chunk=${domains_chunk##*.}
   local droplet="${droplet_name_prefix}${chunk}"
   local status_file="$results_folder"/"$droplet".status
   local droplet_ip num_visited chunk_size status
 
-  droplet_ip=$(get_droplet_ip "$droplet")
-
   while true; do
-    # skip finished and errored scans
+    # retry failed scans
+    if [ -f "$results_folder"/erroredscan."$chunk".out ]; then
+      if create_droplet "$droplet"; then
+        # back up Docker and Badger Sett logs
+        mv "$results_folder"/erroredscan."$chunk"{,."$(date +"%s")"}.out
+        mv "$results_folder"/log."$chunk"{,."$(date +"%s")"}.txt
+
+        init_scan "$droplet" "$domains_chunk" "$tlds_to_exclude"
+      fi
+    fi
+
+    # skip finished and ??? scans
     [ -f "$results_folder"/log."$chunk".txt ] && return
+
+    droplet_ip=$(get_droplet_ip "$droplet")
 
     num_visited=$(ssh_fn noretry crawluser@"$droplet_ip" 'if [ -f ./badger-sett/docker-out/log.txt ]; then grep -E "Visiting [0-9]+:" ./badger-sett/docker-out/log.txt | tail -n1 | sed "s/.*Visiting \([0-9]\+\):.*/\1/"; fi' 2>/dev/null)
 
@@ -343,7 +360,7 @@ update_droplet_status() {
         return
       else
         # wait until we detect scan termination, or num_visited gets populated
-        sleep 5
+        sleep 10
         continue
       fi
     fi
@@ -378,14 +395,18 @@ manage_scans() {
   while true; do
     all_done=true
 
-    # update status files asynchronously
+    # update status files, restart stalled scans,
+    # and retry failed scans asynchronously
     for domains_chunk in "$results_folder"/sitelist.split.*; do
       [ -f "$domains_chunk" ] || continue
 
-      # skip finished and errored scans
-      [ -f "$results_folder"/log."${domains_chunk##*.}".txt ] && continue
+      # skip finished and ??? scans
+      if [ -f "$results_folder"/log."${domains_chunk##*.}".txt ] && \
+        [ ! -f "$results_folder"/erroredscan."${domains_chunk##*.}".out ]; then
+        continue
+      fi
 
-      update_droplet_status "$domains_chunk" &
+      manage_scan "$domains_chunk" &
     done
 
     wait
@@ -412,19 +433,16 @@ manage_scans() {
       echo -ne '\r\033[K' # first erase previous output
 
       if [ -f "$results_folder"/erroredscan."$chunk".out ]; then
+        all_done=false
         echo "$droplet failed"
-        continue
       elif [ -f "$results_folder"/results."$chunk".json ]; then
         echo "$droplet finished"
-        continue
       elif [ -f "$results_folder"/log."$chunk".txt ]; then
         echo "$droplet ??? (see $results_folder/log.${chunk}.txt)"
-        continue
+      else
+        all_done=false
+        echo "$droplet $(cat "$results_folder"/"$droplet".status)"
       fi
-
-      all_done=false
-
-      echo "$droplet $(cat "$results_folder"/"$droplet".status)"
     done
 
     # TODO ETA Xh:Ym
@@ -508,9 +526,6 @@ main() {
     wait
     echo "$results_folder" > output/.run_in_progress
     echo "This run is now resumable (using the -r flag)"
-
-    # wait for the scans to get going (docker run takes a while)
-    sleep 90
   fi
 
   # periodically poll for status, print progress, and clean up when finished
