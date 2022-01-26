@@ -233,10 +233,13 @@ init_scan() {
   # as it might not yet be ready, but this isn't interesting)
   ssh_fn root@"$droplet_ip" 'cloud-init status --wait >/dev/null' 2>/dev/null
 
+  # create non-root user
+  ssh_fn root@"$droplet_ip" 'useradd -m crawluser && cp -r /root/.ssh /home/crawluser/ && chown -R crawluser:crawluser /home/crawluser/.ssh'
+
   install_dependencies "$droplet" "$droplet_ip"
 
-  # create non-root user
-  ssh_fn root@"$droplet_ip" 'useradd -m crawluser && cp -r /root/.ssh /home/crawluser/ && chown -R crawluser:crawluser /home/crawluser/.ssh && usermod -aG docker crawluser'
+  # add non-root user to docker group
+  ssh_fn root@"$droplet_ip" 'usermod -aG docker crawluser'
 
   # check out Badger Sett
   ssh_fn crawluser@"$droplet_ip" 'git clone -q --depth 1 https://github.com/EFForg/badger-sett.git'
