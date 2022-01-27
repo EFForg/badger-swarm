@@ -147,17 +147,7 @@ init_sitelists() {
 create_droplet() {
   local droplet="$1"
   echo "Creating Droplet $droplet ($do_region $do_image $do_size)"
-  doctl compute droplet create "$droplet" --region "$do_region" --image "$do_image" --size "$do_size" --ssh-keys "$do_ssh_key" > /dev/null
-}
-
-wait_for_active_status() {
-  local droplet="$1"
-
-  sleep 10
-  until [ "$(doctl compute droplet get "$droplet" --template "{{.Status}}")" = "active" ] ; do
-    echo "Waiting for $droplet to become active ..."
-    sleep 10
-  done
+  doctl compute droplet create "$droplet" --wait --region "$do_region" --image "$do_image" --size "$do_size" --ssh-keys "$do_ssh_key" >/dev/null
 }
 
 get_droplet_ip() {
@@ -221,8 +211,6 @@ init_scan() {
   local exclude="$3"
 
   local droplet_ip chunk_size
-
-  wait_for_active_status "$droplet"
 
   droplet_ip=$(get_droplet_ip "$droplet")
 
@@ -300,7 +288,7 @@ extract_results() {
     echo "Missing Badger Sett log" > "$results_folder"/log."$chunk".txt
   fi
 
-  while ! doctl compute droplet delete -f "$droplet"; do
+  until doctl compute droplet delete -f "$droplet"; do
     sleep 10
   done
   rm -f "$results_folder"/"$droplet".ip "$results_folder"/"$droplet".status
