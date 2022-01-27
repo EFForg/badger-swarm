@@ -196,11 +196,9 @@ ssh_fn() {
 }
 
 rsync_fn() {
-  declare -i num=1 max_tries=5
   local ret
   set -- -q -e 'ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes' "$@"
-  while rsync "$@"; ret=$?; [ $ret -ne 0 ] && [ "$num" -lt "$max_tries" ]; do
-    num=$((num + 1))
+  while rsync "$@"; ret=$?; [ $ret -ne 0 ] && [ $ret -ne 23 ]; do
     err "Waiting to retry rsync (failed with $ret): $*"
     sleep 10
   done
@@ -287,27 +285,24 @@ extract_results() {
   local droplet_ip="$2"
   local chunk="$3"
 
-  local copy_err=false
-
   if scan_succeeded "$droplet_ip"; then
     # extract results
-    rsync_fn crawluser@"$droplet_ip":badger-sett/results.json "$results_folder"/results."$chunk".json || copy_err=true
+    rsync_fn crawluser@"$droplet_ip":badger-sett/results.json "$results_folder"/results."$chunk".json
   else
     # extract Docker output log
-    rsync_fn crawluser@"$droplet_ip":runscan.out "$results_folder"/erroredscan."$chunk".out || copy_err=true
+    if ! rsync_fn crawluser@"$droplet_ip":runscan.out "$results_folder"/erroredscan."$chunk".out; then
+      echo "Missing Docker output log" > "$results_folder"/erroredscan."$chunk".out
+    fi
   fi
 
   # extract Badger Sett log
   if ! rsync_fn crawluser@"$droplet_ip":badger-sett/log.txt "$results_folder"/log."$chunk".txt; then
-    copy_err=true
-    echo "failed to extract log.txt" > "$results_folder"/log."$chunk".txt
+    echo "Missing Badger Sett log" > "$results_folder"/log."$chunk".txt
   fi
 
-  if [ "$copy_err" = false ]; then
-    doctl compute droplet delete -f "$droplet"
-  else
-    err "Failed to extract one or more files from $droplet"
-  fi
+  while ! doctl compute droplet delete -f "$droplet"; do
+    sleep 10
+  done
   rm -f "$results_folder"/"$droplet".ip "$results_folder"/"$droplet".status
 }
 
@@ -341,7 +336,7 @@ manage_scan() {
       fi
     fi
 
-    # skip finished and ??? scans
+    # skip finished and errored scans
     [ -f "$results_folder"/log."$chunk".txt ] && return
 
     droplet_ip=$(get_droplet_ip "$droplet")
@@ -403,7 +398,7 @@ manage_scans() {
     for domains_chunk in "$results_folder"/sitelist.split.*; do
       [ -f "$domains_chunk" ] || continue
 
-      # skip finished and ??? scans
+      # skip finished scans
       if [ -f "$results_folder"/log."${domains_chunk##*.}".txt ] && \
         [ ! -f "$results_folder"/erroredscan."${domains_chunk##*.}".out ]; then
         continue
