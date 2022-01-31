@@ -522,14 +522,16 @@ main() {
   echo "All scans finished"
   rm output/.run_in_progress
 
-  sleep 10
-  if doctl compute droplet list --format Name | grep -q "$droplet_name_prefix"; then
-    err "WARNING: Not all Droplets deleted?"
-    err "Check with 'doctl compute droplet list --format ID,Name,PublicIPv4,Status'"
-  fi
-
   echo "Merging results ..."
   merge_results || echo "Failed merging results ... fix --pb-dir or enable the Python virtual environment and try again manually?"
+
+  if doctl compute droplet list --format Name | grep -q "$droplet_name_prefix"; then
+    sleep 10
+    if doctl compute droplet list --format Name | grep -q "$droplet_name_prefix"; then
+      err "WARNING: Not all Droplets deleted?"
+      err "Check with 'doctl compute droplet list --format ID,Name,PublicIPv4,Status'"
+    fi
+  fi
 
   echo "All done"
 }
