@@ -381,7 +381,7 @@ manage_scan() {
 
 manage_scans() {
   local all_done domains_chunk chunk droplet
-  local first_time=true
+  declare -i num_lines=0
 
   while true; do
     all_done=true
@@ -402,18 +402,13 @@ manage_scans() {
 
     wait
 
-    # move cursor back up if we're not showing progress for the first time
-    if [ "$first_time" = false ]; then
-      for domains_chunk in "$results_folder"/sitelist.split.*; do
-        [ -f "$domains_chunk" ] || continue
-        # ANSI escape sequences for cursor movement
-        # https://tldp.org/HOWTO/Bash-Prompt-HOWTO/x361.html
-        echo -ne '\033M' # scroll up one line
-      done
-      # TODO
-      #echo -ne '\033M' # one more for the last update line
-    fi
-    first_time=false
+    # erase previous progress output if any
+    while [ $num_lines -gt 0 ]; do
+      # ANSI escape sequences for cursor movement:
+      # https://tldp.org/HOWTO/Bash-Prompt-HOWTO/x361.html
+      echo -ne '\033M\r\033[K' # scroll up a line and erase previous output
+      num_lines=$((num_lines - 1))
+    done
 
     # print statuses
     for domains_chunk in "$results_folder"/sitelist.split.*; do
@@ -421,24 +416,24 @@ manage_scans() {
       chunk=${domains_chunk##*.}
       droplet="${droplet_name_prefix}${chunk}"
 
-      echo -ne '\r\033[K' # first erase previous output
-
       if [ -f "$results_folder"/erroredscan."$chunk".out ]; then
         all_done=false
         echo "$droplet failed"
+        num_lines=$((num_lines + 1))
       elif [ -f "$results_folder"/results."$chunk".json ]; then
-        echo "$droplet finished"
+        : # noop
       elif [ -f "$results_folder"/log."$chunk".txt ]; then
         echo "$droplet ??? (see $results_folder/log.${chunk}.txt)"
+        num_lines=$((num_lines + 1))
       else
         all_done=false
         echo "$droplet $(cat "$results_folder"/"$droplet".status)"
+        num_lines=$((num_lines + 1))
       fi
     done
 
     # TODO ETA Xh:Ym
     #echo "Last update: $(date +'%Y-%m-%dT%H:%M:%S%z')"
-    #echo -ne '\r\033[K' # first erase previous output
     #echo "$total/$num_sites"
 
     [ $all_done = true ] && break
