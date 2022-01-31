@@ -82,19 +82,21 @@ parse_config() {
 
 confirm_run() {
   # TODO hardcoded X sites/hour crawler speed
-  local time_estimate price speed=300 cost_estimate
+  local time_estimate price speed=250 cost_estimate
 
   echo "Starting $(numfmt --to=si "$num_sites") site run \
 with ${browser^} in $do_region with $num_crawlers $do_size Droplets"
 
-  time_estimate=$(echo "$num_sites / $num_crawlers / $speed" | bc -l)
+  # about 27 seconds per Droplet at the start (45 mins for 100 Droplets),
+  # plus however long it takes to scan the number of sites in a chunk
+  time_estimate=$(echo "(27 * $num_crawlers / 60 / 60) + ($num_sites / $num_crawlers / $speed)" | bc -l)
 
   price=$(doctl compute size list --format Slug,PriceHourly | grep "$do_size " | awk '{print $2}')
   [ -z "$price" ] && { err "Failed to look up Droplet prices. Is doctl authenticated?"; exit 1; }
 
-  cost_estimate=$(echo "$num_sites * $price / $speed" | bc -l)
+  cost_estimate=$(echo "$time_estimate * $price * $num_crawlers" | bc -l)
 
-  printf "This will take ~%.0f hours and cost ~\$%.2f\n" "$time_estimate" "$cost_estimate"
+  printf "This will take ~%.1f hours and cost ~\$%.0f\n" "$time_estimate" "$cost_estimate"
   read -p "Continue (y/n)? " -n 1 -r
   echo
   if [ "$REPLY" = y ] || [ "$REPLY" = Y ]; then
