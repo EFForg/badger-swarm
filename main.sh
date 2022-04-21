@@ -58,6 +58,7 @@ parse_config() {
       droplet_name_prefix) readonly droplet_name_prefix="$value" ;;
       num_crawlers) readonly num_crawlers="$value" ;;
       num_sites) readonly num_sites="$value" ;;
+      pb_branch) readonly pb_branch="$value" ;;
       tlds_to_exclude) readonly tlds_to_exclude="$value" ;;
       *) err "Unknown $settings_file setting: $name"; exit 1 ;;
     esac
@@ -90,6 +91,7 @@ Starting distributed Badger Sett run:
   sites:        $(numfmt --to=si "$num_sites")
   Droplets:     $num_crawlers $do_size in $do_region
   browser:      ${browser^}
+  PB branch:    $pb_branch
 
 EOF
 
@@ -255,7 +257,7 @@ init_scan() {
     exclude="--exclude=$exclude"
   fi
   # TODO support configuring --load-extension
-  ssh_fn crawluser@"$droplet_ip" "BROWSER=$browser GIT_PUSH=0 RUN_BY_CRON=1 nohup ./badger-sett/runscan.sh --n-sites $chunk_size --domain-list ./domain-lists/domains.txt $exclude </dev/null >runscan.out 2>&1 &"
+  ssh_fn crawluser@"$droplet_ip" "BROWSER=$browser GIT_PUSH=0 RUN_BY_CRON=1 PB_BRANCH=$pb_branch nohup ./badger-sett/runscan.sh --n-sites $chunk_size --domain-list ./domain-lists/domains.txt $exclude </dev/null >runscan.out 2>&1 &"
 }
 
 scan_terminated() {
@@ -473,11 +475,12 @@ main() {
 
   # settings.ini settings with default values
   local browser=chrome
-  local do_region=nyc2
   local do_image=ubuntu-20-04-x64
+  local do_region=nyc2
   local do_size=s-1vcpu-1gb
   local do_ssh_key=
   local droplet_name_prefix=badger-sett-scanner-
+  local pb_branch=master
   local num_crawlers num_sites tlds_to_exclude
 
   # loop vars and misc.
