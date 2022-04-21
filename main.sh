@@ -84,8 +84,14 @@ confirm_run() {
   # TODO hardcoded X sites/hour crawler speed
   local time_estimate price speed=250 cost_estimate
 
-  echo "Starting $(numfmt --to=si "$num_sites") site run \
-with ${browser^} in $do_region with $num_crawlers $do_size Droplets"
+  cat << EOF
+Starting distributed Badger Sett run:
+
+  sites:        $(numfmt --to=si "$num_sites")
+  Droplets:     $num_crawlers $do_size in $do_region
+  browser:      ${browser^}
+
+EOF
 
   # about 27 seconds per Droplet at the start (45 mins for 100 Droplets),
   # plus however long it takes to scan the number of sites in a chunk
