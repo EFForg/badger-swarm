@@ -14,4 +14,4 @@ browser=chrome
 num_crawlers=2
 num_sites=50
 pb_branch=master
-tlds_to_exclude=mil,gov
+exclude_suffixes=.mil,.gov

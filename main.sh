@@ -59,7 +59,7 @@ parse_config() {
       num_crawlers) readonly num_crawlers="$value" ;;
       num_sites) readonly num_sites="$value" ;;
       pb_branch) readonly pb_branch="$value" ;;
-      tlds_to_exclude) readonly tlds_to_exclude="$value" ;;
+      exclude_suffixes) readonly exclude_suffixes="$value" ;;
       *) err "Unknown $settings_file setting: $name"; exit 1 ;;
     esac
   done < "$settings_file"
@@ -115,12 +115,17 @@ EOF
 }
 
 grep_filter() {
-  local tlds_to_exclude="$1"
-  local tld
+  local exclude_suffixes="$1"
+  local suffix
+
+  if [ -z "$exclude_suffixes" ]; then
+    cat "$2"
+    return
+  fi
 
   shift
-  for tld in ${tlds_to_exclude//','/' '}; do
-    set -- -e "\.${tld}[[:cntrl:]]*$" "$@"
+  for suffix in ${exclude_suffixes//','/' '}; do
+    set -- -e "${suffix}[[:cntrl:]]*$" "$@"
   done
 
   grep -v "$@" 2>/dev/null
@@ -140,8 +145,8 @@ init_sitelists() {
   unzip -oq output/top-1m.csv.zip -d output/
 
   # convert Tranco CSV to list of domains
-  # cut to desired length and with some TLDs filtered out
-  grep_filter "$tlds_to_exclude" output/top-1m.csv | head -n "$num_sites" | cut -d "," -f 2 > output/sitelist.txt
+  # cut to desired length and excluding specified domain suffixes
+  grep_filter "$exclude_suffixes" output/top-1m.csv | head -n "$num_sites" | cut -d "," -f 2 > output/sitelist.txt
 
   # create chunked site lists
   # note: we will use +1 droplet when there is a division remainder
@@ -335,7 +340,7 @@ manage_scan() {
         mv "$results_folder"/erroredscan."$chunk"{,."$(date +"%s")"}.out
         mv "$results_folder"/log."$chunk"{,."$(date +"%s")"}.txt
 
-        init_scan "$droplet" "$domains_chunk" "$tlds_to_exclude"
+        init_scan "$droplet" "$domains_chunk" "$exclude_suffixes"
       fi
     fi
 
@@ -481,7 +486,7 @@ main() {
   local do_ssh_key=
   local droplet_name_prefix=badger-sett-scanner-
   local pb_branch=master
-  local num_crawlers num_sites tlds_to_exclude
+  local num_crawlers num_sites exclude_suffixes
 
   # loop vars and misc.
   local domains_chunk droplet
@@ -513,7 +518,7 @@ main() {
       [ -f "$domains_chunk" ] || continue
       droplet="${droplet_name_prefix}${domains_chunk##*.}"
       if create_droplet "$droplet"; then
-        init_scan "$droplet" "$domains_chunk" "$tlds_to_exclude" &
+        init_scan "$droplet" "$domains_chunk" "$exclude_suffixes" &
       else
         err "Failed to create $droplet"
         mv "$domains_chunk" "$results_folder"/NO_DROPLET."${domains_chunk##*.}"
