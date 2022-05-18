@@ -386,7 +386,7 @@ manage_scan() {
       if [ "$browser" = chrome ]; then
         ssh_fn crawluser@"$droplet_ip" 'pkill chrome'
       elif [ "$browser" = firefox ]; then
-        ssh_fn crawluser@"$droplet_ip" 'pkill -f firefox-bin'
+        ssh_fn crawluser@"$droplet_ip" 'pkill firefox-bin'
       fi
     fi
 
