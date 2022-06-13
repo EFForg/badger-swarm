@@ -162,10 +162,10 @@ init_sitelists() {
 create_droplet() {
   local droplet="$1"
   local ret
-  echo "Creating Droplet $droplet ($do_region $do_image $do_size)"
+  echo "Creating $droplet ($do_region $do_image $do_size)"
   until doctl compute droplet create "$droplet" --wait --region "$do_region" --image "$do_image" --size "$do_size" --ssh-keys "$do_ssh_key" >/dev/null; ret=$?; [ $ret -eq 0 ]; do
     sleep $((5 + RANDOM % 16)) # between 5 and 20 seconds
-    echo "Retrying Droplet $droplet ..."
+    echo "Retrying creating $droplet ..."
   done
   return $ret
 }
