@@ -263,6 +263,9 @@ init_scan() {
   fi
   # TODO support configuring --load-extension
   ssh_fn crawluser@"$droplet_ip" "BROWSER=$browser GIT_PUSH=0 RUN_BY_CRON=1 PB_BRANCH=$pb_branch nohup ./badger-sett/runscan.sh --no-blocking --num-sites $chunk_size --domain-list ./domain-lists/domains.txt $exclude </dev/null >runscan.out 2>&1 &"
+  # TODO if Docker image fails to install (unknown layer in Dockerfile),
+  # TODO we run into log.txt rsync errors as we fail to detect the scan actually failed/never started
+  # TODO update scan_terminated() to be more robust? or, detect and handle when runscan.sh fails?
 }
 
 scan_terminated() {
@@ -357,6 +360,10 @@ manage_scan() {
       continue
     fi
 
+    # TODO make failed scan detection more robust:
+    # TODO we could have a failed scan where log.txt is still in docker-out/
+    # TODO which currently means we'll be stuck in a hopeless "stale" loop
+    # TODO so we should also check that the scan is actually running
     if [ -z "$num_visited" ]; then
       # empty num_visited can happen in the beginning but also at the end,
       # after docker-out/log.txt was moved but before it was extracted
@@ -543,6 +550,8 @@ main() {
 
   echo "Merging results ..."
   merge_results || echo "Failed merging results ... fix --pb-dir or enable the Python virtual environment and try again manually?"
+
+  # TODO summarize error rates (warn about outliers?), restarts, retries (stalls)
 
   if doctl compute droplet list --format Name | grep -q "$droplet_name_prefix"; then
     sleep 10
