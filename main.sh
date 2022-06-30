@@ -516,7 +516,7 @@ main() {
     # confirm before starting
     confirm_run
 
-    results_folder="output/$(numfmt --to=si "$num_sites")-${num_crawlers}-${browser}-${do_size}-$(date +"%s")"
+    results_folder="output/$(numfmt --to=si "$num_sites")-${browser}-${num_crawlers}-${do_size//-/_}-${do_region}-$(date +"%s")"
     echo "Creating $results_folder"
     mkdir -p "$results_folder"
 
