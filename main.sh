@@ -83,7 +83,7 @@ parse_config() {
 
 confirm_run() {
   # TODO hardcoded X sites/hour crawler speed
-  local time_estimate price speed=250 cost_estimate
+  local time_estimate price speed=200 cost_estimate
 
   cat << EOF
 Starting distributed Badger Sett run:
