@@ -60,6 +60,7 @@ parse_config() {
       num_sites) readonly num_sites="$value" ;;
       pb_branch) readonly pb_branch="$value" ;;
       exclude_suffixes) readonly exclude_suffixes="$value" ;;
+      sitelist) readonly sitelist="$value" ;;
       *) err "Unknown $settings_file setting: $name"; exit 1 ;;
     esac
   done < "$settings_file"
@@ -89,6 +90,7 @@ confirm_run() {
 Starting distributed Badger Sett run:
 
   sites:        $(numfmt --to=si "$num_sites")
+  sitelist:     ${sitelist:-"default"}
   Droplets:     $num_crawlers $do_size in $do_region
   browser:      ${browser^}
   PB branch:    $pb_branch
@@ -133,20 +135,24 @@ grep_filter() {
 
 init_sitelists() {
   local top1m_zip=output/top-1m.csv.zip
+  local csv_file=output/top-1m.csv
   local lines_per_list
 
-  # get Tranco list if no zip or old zip
-  # TODO is there a version of the list bigger than 1M?
-  if [ ! -f "$top1m_zip" ] || [ ! "$(find "$top1m_zip" -newermt "1 day ago")" ]; then
-    echo "Downloading Tranco list ..."
-    curl -sSL "https://tranco-list.eu/top-1m.csv.zip" > output/top-1m.csv.zip
-  fi
+  if [ -n "$sitelist" ]; then
+    csv_file=$sitelist
+  else
+    # get Tranco list if no zip or old zip
+    if [ ! -f "$top1m_zip" ] || [ ! "$(find "$top1m_zip" -newermt "1 day ago")" ]; then
+      echo "Downloading Tranco list ..."
+      curl -sSL "https://tranco-list.eu/top-1m.csv.zip" > "$top1m_zip"
+    fi
 
-  unzip -oq output/top-1m.csv.zip -d output/
+    unzip -oq "$top1m_zip" -d output/
+  fi
 
   # convert Tranco CSV to list of domains
   # cut to desired length and excluding specified domain suffixes
-  grep_filter "$exclude_suffixes" output/top-1m.csv | head -n "$num_sites" | cut -d "," -f 2 > output/sitelist.txt
+  grep_filter "$exclude_suffixes" "$csv_file" | head -n "$num_sites" | cut -d "," -f 2 > output/sitelist.txt
 
   # create chunked site lists
   # note: we will use +1 droplet when there is a division remainder
@@ -156,7 +162,10 @@ init_sitelists() {
   split -da 4 --lines="$lines_per_list" output/sitelist.txt "$results_folder"/sitelist.split.
 
   # clean up intermediate files
-  rm output/sitelist.txt output/top-1m.csv
+  rm output/sitelist.txt
+  if [ -z "$sitelist" ]; then
+    rm "$csv_file"
+  fi
 }
 
 create_droplet() {
@@ -498,7 +507,7 @@ main() {
   local do_ssh_key=
   local droplet_name_prefix=badger-sett-scanner-
   local pb_branch=master
-  local num_crawlers num_sites exclude_suffixes
+  local num_crawlers num_sites exclude_suffixes sitelist
 
   # loop vars and misc.
   local domains_chunk droplet

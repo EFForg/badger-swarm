@@ -15,3 +15,5 @@ num_crawlers=2
 num_sites=50
 pb_branch=master
 exclude_suffixes=.mil,.gov
+# for specifying custom Tranco lists
+#sitelist=output/tranco_XXXXX.csv
