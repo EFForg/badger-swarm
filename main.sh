@@ -525,6 +525,13 @@ main() {
     # confirm before starting
     confirm_run
 
+    # validate here and not in parse_config because
+    # we don't care about $sitelist when resuming a run
+    if [ -n "$sitelist" ] && [ ! -f "$sitelist" ]; then
+      err "Custom list file not found: $sitelist"
+      exit 1
+    fi
+
     results_folder="output/$(numfmt --to=si "$num_sites")-${browser}-${num_crawlers}-${do_size//-/_}-${do_region}-$(date +"%s")"
     echo "Creating $results_folder"
     mkdir -p "$results_folder"
