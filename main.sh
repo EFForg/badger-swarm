@@ -532,7 +532,7 @@ main() {
       exit 1
     fi
 
-    results_folder="output/$(numfmt --to=si "$num_sites")-${browser}-${num_crawlers}-${do_size//-/_}-${do_region}-$(date +"%s")"
+    results_folder="output/$(numfmt --to=si "$num_sites")${sitelist+"-CUSTOM_LIST"}-${browser}-${num_crawlers}-${do_size//-/_}-${do_region}-$(date +"%s")"
     echo "Creating $results_folder"
     mkdir -p "$results_folder"
 
