@@ -158,8 +158,7 @@ init_sitelists() {
   # note: we will use +1 droplet when there is a division remainder
   # TODO could be an extra droplet just to visit a single site ...
   lines_per_list=$((num_sites / num_crawlers))
-  # TODO should -da be determined by $num_crawlers?
-  split -da 4 --lines="$lines_per_list" output/sitelist.txt "$results_folder"/sitelist.split.
+  split --suffix-length=3 --numeric-suffixes=1 --lines="$lines_per_list" output/sitelist.txt "$results_folder"/sitelist.split.
 
   # clean up intermediate files
   rm output/sitelist.txt
