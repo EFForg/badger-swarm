@@ -64,12 +64,19 @@ def out(*args):
     print(f"{args[0]:<25}", *args[1:])
 
 def print_scan_stats(path):
+    logfile_glob = 'log.???.txt'
+    if not any(True for _ in path.glob(logfile_glob)):
+        logfile_glob = 'log.????.txt'
+        if not any(True for _ in path.glob(logfile_glob)):
+            print(f"Failed to find log files in {path}\n")
+            return
+
     log_stats = []
-    for log_path in sorted(path.glob('log.????.txt'), key=os.path.getmtime):
+    for log_path in sorted(path.glob(logfile_glob), key=os.path.getmtime):
         log_stats.append(get_log_stats(log_path))
 
     run_start = datetime.fromtimestamp(os.path.getctime(sorted(path.glob('*'), key=os.path.getctime)[0]))
-    run_end = datetime.fromtimestamp(os.path.getmtime(sorted(path.glob('log.????.txt'), key=os.path.getmtime)[-1]))
+    run_end = datetime.fromtimestamp(os.path.getmtime(sorted(path.glob(logfile_glob), key=os.path.getmtime)[-1]))
     sites_success = sum(i['num_visited'] for i in log_stats)
     sites_total = sum(i['num_sites'] for i in log_stats)
     links_total = sum(i['num_links'] for i in log_stats)
