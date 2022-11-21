@@ -306,16 +306,16 @@ extract_results() {
 
   if scan_succeeded "$droplet_ip"; then
     # extract results
-    rsync_fn crawluser@"$droplet_ip":badger-sett/results.json "$results_folder"/results."$chunk".json
+    rsync_fn crawluser@"$droplet_ip":badger-sett/results.json "$results_folder"/results."$chunk".json 2>/dev/null
   else
     # extract Docker output log
-    if ! rsync_fn crawluser@"$droplet_ip":runscan.out "$results_folder"/erroredscan."$chunk".out; then
+    if ! rsync_fn crawluser@"$droplet_ip":runscan.out "$results_folder"/erroredscan."$chunk".out 2>/dev/null; then
       echo "Missing Docker output log" > "$results_folder"/erroredscan."$chunk".out
     fi
   fi
 
   # extract Badger Sett log
-  if ! rsync_fn crawluser@"$droplet_ip":badger-sett/log.txt "$results_folder"/log."$chunk".txt; then
+  if ! rsync_fn crawluser@"$droplet_ip":badger-sett/log.txt "$results_folder"/log."$chunk".txt 2>/dev/null; then
     echo "Missing Badger Sett log" > "$results_folder"/log."$chunk".txt
   fi
 
@@ -433,9 +433,12 @@ manage_scans() {
     wait
 
     # erase previous progress output if any
+    # TODO can't scroll beyond the number of lines that fit in the window
     while [ $num_lines -gt 0 ]; do
       # ANSI escape sequences for cursor movement:
       # https://tldp.org/HOWTO/Bash-Prompt-HOWTO/x361.html
+      # TODO if we produce ANY output (like error messages) that's not covered by num_lines,
+      # TODO we fail to erase that number of droplet status lines
       echo -ne '\033M\r\033[K' # scroll up a line and erase previous output
       num_lines=$((num_lines - 1))
     done
