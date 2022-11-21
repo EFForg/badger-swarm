@@ -2,9 +2,11 @@
 
 # pylint: disable=too-many-locals
 
+import fnmatch
 import os
 import pathlib
 import re
+import sys
 
 from datetime import datetime
 
@@ -96,6 +98,10 @@ def print_scan_stats(path):
 
 
 if __name__ == '__main__':
-    scan_paths = [x for x in pathlib.Path('output').iterdir() if x.is_dir()]
+    # to limit output, add match pattern strings as positional arguments
+    # these are matched (with wildcards) against scan results directory names
+    # for example: ./stats.py chrome 20K
+    scan_paths = [x for x in pathlib.Path('output').iterdir() if x.is_dir() and
+                  all(fnmatch.fnmatch(x, f"*{s}*") for s in sys.argv[1:])]
     for path in sorted(scan_paths, key=os.path.getmtime):
         print_scan_stats(path)
