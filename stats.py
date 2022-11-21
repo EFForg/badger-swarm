@@ -74,7 +74,7 @@ def print_scan_stats(path):
     sites_total = sum(i['num_sites'] for i in log_stats)
     links_total = sum(i['num_links'] for i in log_stats)
     link_click_rate = round(links_total / sites_success * 100, 1)
-    link_failure_rate = round(sum(i['num_links_failed'] for i in log_stats) * 100 / links_total, 1)
+    link_failure_rate = round(sum(i['num_links_failed'] for i in log_stats) * 100 / links_total, 1) if links_total else 0
     error_avg = round(sum(i['error_rate'] for i in log_stats) / len(log_stats), 1)
     error_max = round(max(i['error_rate'] for i in log_stats), 1)
     restarts_total = sum(i['num_restarts'] for i in log_stats)
