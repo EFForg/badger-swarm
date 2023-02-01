@@ -71,12 +71,12 @@ parse_config() {
     exit 1
   fi
 
-  if [ "$num_crawlers" -lt 1 ] || [ "$num_crawlers" -gt 100 ]; then
+  if [ -z "$num_crawlers" ] || [ "$num_crawlers" -lt 1 ] || [ "$num_crawlers" -gt 100 ]; then
     err "num_crawlers must be > 0 and <= 100"
     exit 1
   fi
 
-  if [ "$num_sites" -lt 1 ] || [ "$num_sites" -gt 1000000 ]; then
+  if [ -z "$num_sites" ] || [ "$num_sites" -lt 1 ] || [ "$num_sites" -gt 1000000 ]; then
     err "num_sites must be > 0 and <= 1,000,000"
     exit 1
   fi
