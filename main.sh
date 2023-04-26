@@ -229,8 +229,14 @@ install_dependencies() {
   local aptget_with_opts='DEBIAN_FRONTEND=noninteractive apt-get -qq -o DPkg::Lock::Timeout=60 -o Dpkg::Use-Pty=0'
 
   echo "Installing dependencies on $droplet ($droplet_ip) ..."
-  ssh_fn root@"$droplet_ip" "$aptget_with_opts update >/dev/null 2>&1"
-  ssh_fn root@"$droplet_ip" "$aptget_with_opts install docker.io >/dev/null 2>&1"
+  while true; do
+    ssh_fn root@"$droplet_ip" "$aptget_with_opts update >/dev/null 2>&1"
+    ssh_fn root@"$droplet_ip" "$aptget_with_opts install docker.io >/dev/null 2>&1"
+    if ssh_fn root@"$droplet_ip" "command -v docker >/dev/null 2>&1"; then
+      break
+    fi
+    sleep 10
+  done
 }
 
 init_scan() {
@@ -256,7 +262,9 @@ init_scan() {
   ssh_fn root@"$droplet_ip" 'usermod -aG docker crawluser'
 
   # check out Badger Sett
-  ssh_fn crawluser@"$droplet_ip" 'git clone -q --depth 1 https://github.com/EFForg/badger-sett.git'
+  until ssh_fn crawluser@"$droplet_ip" 'git clone -q --depth 1 https://github.com/EFForg/badger-sett.git'; do
+    sleep 10
+  done
 
   # remove previous scan results to avoid any potential confusion
   ssh_fn crawluser@"$droplet_ip" 'rm badger-sett/results.json badger-sett/log.txt'
