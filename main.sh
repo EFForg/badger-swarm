@@ -563,6 +563,7 @@ main() {
 
     # save run params
     cp settings.ini "$results_folder"/run_settings.ini
+    sed -i.bak 's/^do_ssh_key=.\+$/do_ssh_key=[REDACTED]/' "$results_folder"/run_settings.ini && rm "$results_folder"/run_settings.ini.bak
 
     init_sitelists
 
