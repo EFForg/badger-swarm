@@ -169,12 +169,27 @@ init_sitelists() {
 
 create_droplet() {
   local droplet="$1"
-  local ret
+  local ret retry_count=0
+
   echo "Creating $droplet ($do_region $do_image $do_size)"
-  until doctl compute droplet create "$droplet" --wait --region "$do_region" --image "$do_image" --size "$do_size" --ssh-keys "$do_ssh_key" >/dev/null; ret=$?; [ $ret -eq 0 ]; do
-    sleep $((5 + RANDOM % 16)) # between 5 and 20 seconds
-    echo "Retrying creating $droplet ..."
+
+  until doctl compute droplet create "$droplet" --region "$do_region" --image "$do_image" --size "$do_size" --ssh-keys "$do_ssh_key" >/dev/null; ret=$?; [ $ret -eq 0 ]; do
+    echo "Retrying creating $droplet after delay ..."
+    retry_count=$((retry_count + 1))
+    sleep $(((5 + RANDOM % 16) * retry_count)) # between 5*N and 20*N seconds
   done
+
+  # wait for active status
+  retry_count=0
+  sleep 5
+  until [ "$(doctl compute droplet get "$droplet" --template "{{.Status}}" 2>/dev/null)" = "active" ]; do
+    if [ $retry_count -gt 2 ]; then
+      echo "Still waiting for $droplet to become active ..."
+    fi
+    retry_count=$((retry_count + 1))
+    sleep $((5 * retry_count)) # 5*N seconds
+  done
+
   return $ret
 }
 
