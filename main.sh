@@ -370,7 +370,7 @@ print_progress() {
   local bar_fill bar_empty
   printf -v bar_fill "%${num_filled}s"
   printf -v bar_empty "%$((30 - num_filled))s" # num_empty
-  printf "[${bar_fill// /#}${bar_empty}] %*s  $pct%%\n" $((${#total} * 2 + 2)) "$curval/$total"
+  printf "[${bar_fill// /░}${bar_empty}] %*s  $pct%%\n" $((${#total} * 2 + 2)) "$curval/$total"
 }
 
 manage_scan() {
