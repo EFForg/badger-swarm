@@ -54,7 +54,7 @@ parse_config() {
       do_image) readonly do_image="$value" ;;
       do_region) readonly do_region="$value" ;;
       do_size) readonly do_size="$value" ;;
-      do_ssh_key) readonly do_ssh_key="$value" ;;
+      do_ssh_key) [ "$value" != "[REDACTED]" ] && readonly do_ssh_key="$value" ;;
       droplet_name_prefix) readonly droplet_name_prefix="$value" ;;
       num_crawlers) readonly num_crawlers="$value" ;;
       num_sites) readonly num_sites="$value" ;;
@@ -67,8 +67,22 @@ parse_config() {
 
   # do_ssh_key must be provided as it's required and there is no default
   if [ -z "$do_ssh_key" ]; then
-    err "Missing $settings_file setting: do_ssh_key"
-    exit 1
+    if [ "$settings_file" = settings.ini ]; then
+      err "Missing $settings_file setting: do_ssh_key"
+      exit 1
+    else
+      # try getting the key from the default settings file
+      while IFS='= ' read -r name value; do
+        if [ "$name" = "do_ssh_key" ]; then
+          readonly do_ssh_key="$value"
+          break
+        fi
+      done < settings.ini
+      if [ -z "$do_ssh_key" ]; then
+        err "Unable to find do_ssh_key in settings.ini"
+        exit 1
+      fi
+    fi
   fi
 
   if [ -z "$num_crawlers" ] || [ "$num_crawlers" -lt 1 ] || [ "$num_crawlers" -gt 100 ]; then
