@@ -111,6 +111,7 @@ Starting distributed Badger Sett run:
 
 EOF
 
+  # TODO update Droplet creation estimate
   # about 27 seconds per Droplet at the start (45 mins for 100 Droplets),
   # plus however long it takes to scan the number of sites in a chunk
   time_estimate=$(echo "(27 * $num_crawlers / 60 / 60) + ($num_sites / $num_crawlers / $speed)" | bc -l)
@@ -197,7 +198,7 @@ create_droplet() {
   retry_count=0
   sleep 5
   until [ "$(doctl compute droplet get "$droplet" --template "{{.Status}}" 2>/dev/null)" = "active" ]; do
-    if [ $retry_count -gt 2 ]; then
+    if [ $retry_count -gt 3 ]; then
       echo "Still waiting for $droplet to become active ..."
     fi
     retry_count=$((retry_count + 1))
@@ -584,13 +585,15 @@ main() {
     # create droplets and initiate scans
     for domains_chunk in "$results_folder"/sitelist.split.*; do
       [ -f "$domains_chunk" ] || continue
-      droplet="${droplet_name_prefix}${domains_chunk##*.}"
-      if create_droplet "$droplet"; then
-        init_scan "$droplet" "$domains_chunk" "$exclude_suffixes" &
-      else
-        err "Failed to create $droplet"
-        mv "$domains_chunk" "$results_folder"/NO_DROPLET."${domains_chunk##*.}"
-      fi
+      {
+        droplet="${droplet_name_prefix}${domains_chunk##*.}"
+        if create_droplet "$droplet"; then
+          init_scan "$droplet" "$domains_chunk" "$exclude_suffixes"
+        else
+          err "Failed to create $droplet"
+          mv "$domains_chunk" "$results_folder"/NO_DROPLET."${domains_chunk##*.}"
+        fi
+      } &
     done
 
     wait
