@@ -110,5 +110,6 @@ if __name__ == '__main__':
     # for example: ./stats.py chrome 20K
     scan_paths = [x for x in pathlib.Path('output').iterdir() if x.is_dir() and
                   all(fnmatch.fnmatch(x, f"*{s}*") for s in sys.argv[1:])]
-    for path in sorted(scan_paths, key=os.path.getmtime):
+    # sort by date started
+    for path in sorted(scan_paths, key=lambda path: os.path.getctime(sorted(path.glob('*'), key=os.path.getctime)[0])):
         print_scan_stats(path)
