@@ -447,9 +447,23 @@ manage_scan() {
   done
 }
 
+onint() {
+  # send HUP to the whole process group
+  # to avoid leaving subprocesses behind after a Ctrl-C
+  kill -HUP -$$
+}
+
+onhup() {
+  echo
+  exit
+}
+
 manage_scans() {
   local all_done domains_chunk chunk droplet
   declare -i num_lines=0
+
+  trap onhup HUP
+  trap onint INT
 
   while true; do
     all_done=true
@@ -512,6 +526,10 @@ manage_scans() {
     sleep 30
 
   done
+
+  # restore default signal behavior
+  trap - INT
+  trap - HUP
 }
 
 merge_results() {
