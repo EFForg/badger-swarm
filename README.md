@@ -1,6 +1,6 @@
-# badger-sett-orchestration
+# Badger Swarm
 
-Runs distributed [Badger Sett](https://github.com/EFForg/badger-sett) scans on Digital Ocean.
+Runs distributed [Badger Sett](https://github.com/EFForg/badger-sett) scans on Digital Ocean. Yes, a group of badgers is called a _cete_, but "swarm" just sounds better.
 
 ## Setup
 
