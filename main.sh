@@ -233,7 +233,7 @@ ssh_fn() {
 
   local ret
 
-  set -- -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes "$@"
+  set -- -q -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$results_folder/known_hosts" -o BatchMode=yes "$@"
   while ssh "$@"; ret=$?; [ $ret -eq 255 ]; do
     [ $retry = false ] && break
     err "Waiting to retry SSH: $*"
@@ -245,7 +245,7 @@ ssh_fn() {
 
 rsync_fn() {
   local ret
-  set -- -q -e 'ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes' "$@"
+  set -- -q -e 'ssh -q -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile='"$results_folder"'/known_hosts -o BatchMode=yes' "$@"
   while rsync "$@"; ret=$?; [ $ret -ne 0 ] && [ $ret -ne 23 ]; do
     err "Waiting to retry rsync (failed with $ret): $*"
     sleep 10
