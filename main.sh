@@ -5,7 +5,6 @@ err() {
 }
 
 parse_args() {
-  local OPTIND
   local usage="Usage: $0 [-r]"
 
   while getopts 'r' flag; do
