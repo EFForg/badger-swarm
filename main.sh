@@ -260,7 +260,14 @@ install_dependencies() {
   echo "Installing dependencies on $droplet ($droplet_ip) ..."
   while true; do
     ssh_fn root@"$droplet_ip" "$aptget_with_opts update >/dev/null 2>&1"
-    ssh_fn root@"$droplet_ip" "$aptget_with_opts install docker.io >/dev/null 2>&1"
+    ssh_fn root@"$droplet_ip" "$aptget_with_opts install ca-certificates curl gnupg >/dev/null 2>&1"
+    ssh_fn root@"$droplet_ip" 'install -m 0755 -d /etc/apt/keyrings'
+    ssh_fn root@"$droplet_ip" 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg'
+    ssh_fn root@"$droplet_ip" 'chmod a+r /etc/apt/keyrings/docker.gpg'
+    # shellcheck disable=SC2016
+    ssh_fn root@"$droplet_ip" 'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list'
+    ssh_fn root@"$droplet_ip" "$aptget_with_opts update >/dev/null 2>&1"
+    ssh_fn root@"$droplet_ip" "$aptget_with_opts install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >/dev/null 2>&1"
     if ssh_fn root@"$droplet_ip" "command -v docker >/dev/null 2>&1"; then
       break
     fi
