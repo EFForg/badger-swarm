@@ -7,7 +7,8 @@ do_ssh_key=
 do_region=sfo1
 # see `doctl compute size list`
 do_size=s-2vcpu-4gb
-do_image=ubuntu-20-04-x64
+# see `doctl compute image list-distribution`
+do_image=ubuntu-22-04-x64
 
 [Badger Sett settings]
 browser=chrome
