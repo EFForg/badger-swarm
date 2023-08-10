@@ -5,6 +5,7 @@ err() {
 }
 
 parse_args() {
+  local OPTIND # enables multiple calls to getopts in same shell invocation
   local usage="Usage: $0 [-r]"
 
   while getopts 'r' flag; do
