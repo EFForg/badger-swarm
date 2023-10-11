@@ -2,6 +2,8 @@
 
 Runs distributed [Badger Sett](https://github.com/EFForg/badger-sett) scans on Digital Ocean. Yes, a group of badgers is called a _cete_, but "swarm" just sounds better.
 
+![badger-swarm-movie](https://github.com/EFForg/badger-swarm/assets/794578/fb6bb9ec-fdeb-4bd1-acd2-22f5fd408467)
+
 
 ## Architecture
 
