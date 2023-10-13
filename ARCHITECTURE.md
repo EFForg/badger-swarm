@@ -68,44 +68,71 @@ This continues until all scans finish.
 ```mermaid
 stateDiagram-v2
 
-[*] --> PollForStatus
+[*] --> ManageScans
 
 state fork2 <<fork>>
-PollForStatus --> fork2
+ManageScans --> fork2
 fork2 --> CheckBadgerScan1
 fork2 --> CheckBadgerScan2
 fork2 --> CheckBadgerScanN
 
-state ManageInProgressScans {
-    err1: CheckForFailure
-    err2: CheckForFailure
-    err3: CheckForFailure
+state PollInProgressScansForStatus {
+    chk1: CheckForFailure
+    cr1: CreateDroplet
+    dep1: InstallDependencies
+    go1: StartScan
     pro1: ExtractProgress
-    pro2: ExtractProgress
-    pro3: ExtractProgress
+    ter1: CheckForTermination
+    fin1: ExtractResults
+    fai1: ExtractErrorLog
+    del1: DeleteDroplet
     sta1: CheckForStall
-    sta2: CheckForStall
-    sta3: CheckForStall
+    res1: RestartScan
+    ddd2: ...
+    ddd3: ...
 
     state CheckBadgerScan1 {
-        [*] --> err1
-        err1 --> pro1
-        pro1 --> sta1
-        sta1 --> [*]
+        [*] --> chk1
+
+        state scan1_failed <<choice>>
+        chk1 --> scan1_failed
+        scan1_failed --> cr1 : Scan previously failed
+        scan1_failed --> pro1 : No error log found
+
+        cr1 --> dep1
+        dep1 --> UploadSiteList1
+        UploadSiteList1 --> go1
+        go1 --> [*]
+
+        pro1 --> ter1
+
+        state scan1_term <<choice>>
+        ter1 --> scan1_term
+        scan1_term --> fin1 : Scan finished
+        scan1_term --> fai1: Scan failed
+        scan1_term --> sta1 : Scan is still running
+
+        fin1 --> del1
+        fai1 --> del1
+
+        del1 --> [*]
+
+        state scan1_stall <<choice>>
+        sta1 --> scan1_stall
+        scan1_stall --> res1: Progress file is stale
+        scan1_stall --> [*] : Progress was updated recently
+
+        res1 --> [*]
     }
     --
     state CheckBadgerScan2 {
-        [*] --> err2
-        err2 --> pro2
-        pro2 --> sta2
-        sta2 --> [*]
+        [*] --> ddd2
+        ddd2 --> [*]
     }
     --
     state CheckBadgerScanN {
-        [*] --> err3
-        err3 --> pro3
-        pro3 --> sta3
-        sta3 --> [*]
+        [*] --> ddd3
+        ddd3 --> [*]
     }
 }
 
@@ -114,12 +141,12 @@ CheckBadgerScan1 --> join2
 CheckBadgerScan2 --> join2
 CheckBadgerScanN --> join2
 
-state check1 <<choice>>
-join2 --> check1
-check1 --> PrintProgress : One or more scans still running
-check1 --> MergeResults : All scans finished
+state all_finished <<choice>>
+join2 --> all_finished
+all_finished --> PrintProgress : One or more scan results missing
+all_finished --> MergeResults : All scans completed successfully
 
-PrintProgress --> PollForStatus
+PrintProgress --> ManageScans
 
 MergeResults --> [*]
 ```
