@@ -439,7 +439,7 @@ manage_scan() {
       echo "$status" > "$status_file"
 
     # no change in progress and the status file is now stale
-    elif [ ! "$(find "$status_file" -newermt "15 minutes ago")" ]; then
+    elif [ ! "$(find "$status_file" -newermt "6 minutes ago")" ]; then
       echo "stalled" > "$status_file"
 
       # force a restart by killing the browser
