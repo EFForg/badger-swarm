@@ -18,3 +18,9 @@ pb_branch=master
 exclude_suffixes=.mil,.gov
 # for specifying custom Tranco lists
 #sitelist=output/tranco_XXXXX.csv
+
+[local repository paths]
+# Badger Sett
+bs_repo_dir=../badger-sett
+# Privacy Badger
+pb_repo_dir=../privacybadger

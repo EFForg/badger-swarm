@@ -51,6 +51,7 @@ parse_config() {
 
     case "$name" in
       browser) readonly browser="$value" ;;
+      bs_repo_dir) readonly bs_repo_dir="$value" ;;
       do_image) readonly do_image="$value" ;;
       do_region) readonly do_region="$value" ;;
       do_size) readonly do_size="$value" ;;
@@ -59,6 +60,7 @@ parse_config() {
       num_crawlers) readonly num_crawlers="$value" ;;
       num_sites) readonly num_sites="$value" ;;
       pb_branch) readonly pb_branch="$value" ;;
+      pb_repo_dir) readonly pb_repo_dir="$value" ;;
       exclude_suffixes) readonly exclude_suffixes="$value" ;;
       sitelist) readonly sitelist="$value" ;;
       *) err "Unknown $settings_file setting: $name"; exit 1 ;;
@@ -545,16 +547,14 @@ merge_results() {
     set -- --load-data="$results_chunk" "$@"
   done
 
-  # TODO badger_sett_dir and --pb-dir should be in settings.ini
-
-  echo "../badger-sett/crawler.py chrome 0 --pb-dir ../privacybadger/ $*"
-  if ! ../badger-sett/crawler.py chrome 0 --pb-dir ../privacybadger/ "$@"; then
+  echo "${bs_repo_dir}/crawler.py chrome 0 --pb-dir $pb_repo_dir $*"
+  if ! "$bs_repo_dir"/crawler.py chrome 0 --pb-dir "$pb_repo_dir" "$@"; then
     return 1
   fi
   mv results.json "$results_folder"/ && rm log.txt
 
-  echo "../badger-sett/crawler.py chrome 0 --no-blocking --pb-dir ../privacybadger/ $*"
-  if ! ../badger-sett/crawler.py chrome 0 --no-blocking --pb-dir ../privacybadger/ "$@"; then
+  echo "${bs_repo_dir}/crawler.py chrome 0 --no-blocking --pb-dir $pb_repo_dir $*"
+  if ! "$bs_repo_dir"/crawler.py chrome 0 --no-blocking --pb-dir "$pb_repo_dir" "$@"; then
     return 1
   fi
   mv results.json "$results_folder"/results-noblocking.json && rm log.txt
@@ -573,6 +573,7 @@ main() {
   local droplet_name_prefix=badger-sett-scanner-
   local pb_branch=master
   local num_crawlers num_sites exclude_suffixes sitelist
+  local bs_repo_dir pb_repo_dir
 
   # loop vars and misc.
   local domains_chunk droplet
