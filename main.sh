@@ -133,55 +133,33 @@ EOF
   exit 0
 }
 
-grep_filter() {
-  local exclude_suffixes="$1"
-  local suffix
-
-  if [ -z "$exclude_suffixes" ]; then
-    cat "$2"
-    return
-  fi
-
-  shift
-  for suffix in ${exclude_suffixes//','/' '}; do
-    set -- -e "${suffix}[[:cntrl:]]*$" "$@"
-  done
-
-  grep -v "$@" 2>/dev/null
-}
-
 init_sitelists() {
-  local top1m_zip=output/top-1m.csv.zip
-  local csv_file=output/top-1m.csv
   local lines_per_list
+  local tempfile=output/sitelist.txt
 
   if [ -n "$sitelist" ]; then
-    csv_file=$sitelist
-  else
-    # get Tranco list if no zip or old zip
-    if [ ! -f "$top1m_zip" ] || [ ! "$(find "$top1m_zip" -newermt "1 day ago")" ]; then
-      echo "Downloading Tranco list ..."
-      curl -sSL "https://tranco-list.eu/top-1m.csv.zip" > "$top1m_zip"
-    fi
-
-    unzip -oq "$top1m_zip" -d output/
+    set -- --domain-list="$sitelist" "$@"
   fi
 
-  # convert Tranco CSV to list of domains
-  # cut to desired length and excluding specified domain suffixes
-  grep_filter "$exclude_suffixes" "$csv_file" | head -n "$num_sites" | cut -d "," -f 2 > output/sitelist.txt
+  if [ -n "$exclude_suffixes" ]; then
+    set -- --exclude="$exclude_suffixes" "$@"
+  fi
+
+  if ! "$bs_repo_dir"/crawler.py chrome "$num_sites" --get-sitelist-only "$@" > $tempfile; then
+    rm $tempfile
+    return 1
+  fi
+
+  # randomize to even out performance (top sites should produce fewer errors)
+  shuf $tempfile --output $tempfile
 
   # create chunked site lists
   # note: we will use +1 droplet when there is a division remainder
   # TODO could be an extra droplet just to visit a single site ...
   lines_per_list=$((num_sites / num_crawlers))
-  split --suffix-length=3 --numeric-suffixes=1 --lines="$lines_per_list" output/sitelist.txt "$results_folder"/sitelist.split.
+  split --suffix-length=3 --numeric-suffixes=1 --lines="$lines_per_list" $tempfile "$results_folder"/sitelist.split.
 
-  # clean up intermediate files
-  rm output/sitelist.txt
-  if [ -z "$sitelist" ]; then
-    rm "$csv_file"
-  fi
+  rm $tempfile
 }
 
 create_droplet() {
@@ -606,7 +584,10 @@ main() {
     cp settings.ini "$results_folder"/run_settings.ini
     sed -i.bak 's/^do_ssh_key=.\+$/do_ssh_key=[REDACTED]/' "$results_folder"/run_settings.ini && rm "$results_folder"/run_settings.ini.bak
 
-    init_sitelists
+    if ! init_sitelists; then
+      echo "Failed generating the site list ... Check bs_repo_dir config value and/or enable the Python virtual environment for Badger Sett, and try again"
+      exit 1
+    fi
 
     # create droplets and initiate scans
     for domains_chunk in "$results_folder"/sitelist.split.*; do
@@ -634,7 +615,7 @@ main() {
   rm output/.run_in_progress
 
   echo "Merging results ..."
-  merge_results || echo "Failed merging results ... fix --pb-dir or enable the Python virtual environment and try again manually?"
+  merge_results || echo "Failed merging results ... Check bs_repo_dir and pb_repo_dir config values and/or enable the Python virtual environment for Badger Sett"
 
   # TODO summarize error rates (warn about outliers?), restarts, retries (stalls)
 
