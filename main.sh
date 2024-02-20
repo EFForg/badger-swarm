@@ -315,7 +315,7 @@ init_scan() {
     exclude="--exclude=$exclude"
   fi
   # TODO support configuring --load-extension
-  ssh_fn crawluser@"$droplet_ip" "BROWSER=$browser GIT_PUSH=0 RUN_BY_CRON=1 PB_BRANCH=$pb_branch nohup ./badger-sett/runscan.sh --no-blocking --num-sites $chunk_size --domain-list ./domain-lists/domains.txt $exclude </dev/null >runscan.out 2>&1 &"
+  ssh_fn crawluser@"$droplet_ip" "BROWSER=$browser GIT_PUSH=0 RUN_BY_CRON=1 PB_BRANCH=$pb_branch nohup ./badger-sett/runscan.sh $chunk_size --no-blocking --domain-list ./domain-lists/domains.txt $exclude </dev/null >runscan.out 2>&1 &"
   # TODO if Docker image fails to install (unknown layer in Dockerfile),
   # TODO we run into log.txt rsync errors as we fail to detect the scan actually failed/never started
   # TODO update scan_terminated() to be more robust? or, detect and handle when runscan.sh fails?
@@ -547,14 +547,14 @@ merge_results() {
 
   # TODO badger_sett_dir and --pb-dir should be in settings.ini
 
-  echo "../badger-sett/crawler.py --num-sites 0 --browser chrome --pb-dir ../privacybadger/ $*"
-  if ! ../badger-sett/crawler.py --num-sites 0 --browser chrome --pb-dir ../privacybadger/ "$@"; then
+  echo "../badger-sett/crawler.py chrome 0 --pb-dir ../privacybadger/ $*"
+  if ! ../badger-sett/crawler.py chrome 0 --pb-dir ../privacybadger/ "$@"; then
     return 1
   fi
   mv results.json "$results_folder"/ && rm log.txt
 
-  echo "../badger-sett/crawler.py --no-blocking --num-sites 0 --browser chrome --pb-dir ../privacybadger/ $*"
-  if ! ../badger-sett/crawler.py --no-blocking --num-sites 0 --browser chrome --pb-dir ../privacybadger/ "$@"; then
+  echo "../badger-sett/crawler.py chrome 0 --no-blocking --pb-dir ../privacybadger/ $*"
+  if ! ../badger-sett/crawler.py chrome 0 --no-blocking --pb-dir ../privacybadger/ "$@"; then
     return 1
   fi
   mv results.json "$results_folder"/results-noblocking.json && rm log.txt
