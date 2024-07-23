@@ -145,7 +145,7 @@ init_sitelists() {
     set -- --exclude="$exclude_suffixes" "$@"
   fi
 
-  if ! "$bs_repo_dir"/crawler.py chrome "$num_sites" --get-sitelist-only "$@" > $tempfile; then
+  if ! "$bs_repo_dir"/crawler.py chrome "$num_sites" --exclude-failures-since='1 month' --get-sitelist-only "$@" > $tempfile; then
     rm $tempfile
     return 1
   fi
@@ -295,7 +295,7 @@ init_scan() {
     exclude="--exclude=$exclude"
   fi
   # TODO support configuring --load-extension
-  ssh_fn crawluser@"$droplet_ip" "BROWSER=$browser GIT_PUSH=0 RUN_BY_CRON=1 PB_BRANCH=$pb_branch nohup ./badger-sett/runscan.sh $chunk_size --no-blocking --domain-list ./domain-lists/domains.txt $exclude </dev/null >runscan.out 2>&1 &"
+  ssh_fn crawluser@"$droplet_ip" "BROWSER=$browser GIT_PUSH=0 RUN_BY_CRON=1 PB_BRANCH=$pb_branch nohup ./badger-sett/runscan.sh $chunk_size --no-blocking --domain-list ./domain-lists/domains.txt --exclude-failures-since=off $exclude </dev/null >runscan.out 2>&1 &"
   # TODO if Docker image fails to install (unknown layer in Dockerfile),
   # TODO we run into log.txt rsync errors as we fail to detect the scan actually failed/never started
   # TODO update scan_terminated() to be more robust? or, detect and handle when runscan.sh fails?
