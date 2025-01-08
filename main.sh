@@ -332,6 +332,11 @@ extract_results() {
   if scan_succeeded "$droplet_ip"; then
     # extract results
     rsync_fn crawluser@"$droplet_ip":badger-sett/results.json "$results_folder"/results."$chunk".json 2>/dev/null
+    # and screenshots, if any
+    if ssh_fn crawluser@"$droplet_ip" '[ -d ./badger-sett/screenshots ]' 2>/dev/null; then
+      mkdir -p "$results_folder"/screenshots
+      rsync_fn crawluser@"$droplet_ip":badger-sett/screenshots/* "$results_folder"/screenshots
+    fi
   else
     # extract Docker output log
     if ! rsync_fn crawluser@"$droplet_ip":runscan.out "$results_folder"/erroredscan."$chunk".out 2>/dev/null; then
