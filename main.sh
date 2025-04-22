@@ -549,7 +549,7 @@ main() {
 
   # settings.ini settings with default values
   local browser=chrome
-  local do_image=ubuntu-22-04-x64
+  local do_image=ubuntu-24-04-x64
   local do_region=nyc2
   local do_size=s-1vcpu-1gb
   local do_ssh_key=

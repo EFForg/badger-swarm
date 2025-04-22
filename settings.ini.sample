@@ -8,7 +8,7 @@ do_region=sfo1
 # see `doctl compute size list`
 do_size=s-2vcpu-4gb
 # see `doctl compute image list-distribution`
-do_image=ubuntu-22-04-x64
+do_image=ubuntu-24-04-x64
 
 [Badger Sett settings]
 browser=chrome
