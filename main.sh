@@ -534,13 +534,13 @@ merge_results() {
   if ! "$bs_repo_dir"/crawler.py chrome 0 --pb-dir "$pb_repo_dir" "$@"; then
     return 1
   fi
-  mv results.json "$results_folder"/ && rm log.txt
+  mv results.json "$results_folder"/
 
   echo "${bs_repo_dir}/crawler.py chrome 0 --no-blocking --pb-dir $pb_repo_dir $*"
   if ! "$bs_repo_dir"/crawler.py chrome 0 --no-blocking --pb-dir "$pb_repo_dir" "$@"; then
     return 1
   fi
-  mv results.json "$results_folder"/results-noblocking.json && rm log.txt
+  mv results.json "$results_folder"/results-noblocking.json
 }
 
 main() {
