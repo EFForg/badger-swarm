@@ -18,6 +18,11 @@ pb_branch=master
 exclude_suffixes=.mil,.mil.??,.gov,.gov.??
 # for specifying custom Tranco lists
 #sitelist=output/tranco_XXXXX.csv
+# any other commandline flags
+#bsargs[]=take-screenshots
+#bsargs[]=no-gpc
+#bsargs[]=no-link-clicking
+#bsargs[]=collect-and-clear-cookies
 
 [local repository paths]
 # Badger Sett

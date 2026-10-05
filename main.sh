@@ -63,6 +63,7 @@ parse_config() {
       pb_repo_dir) readonly pb_repo_dir="$value" ;;
       exclude_suffixes) readonly exclude_suffixes="$value" ;;
       sitelist) readonly sitelist="$value" ;;
+      bsargs[]) bs_args="${bs_args}${bs_args:+ }--$value" ;;
       *) err "Unknown $settings_file setting: $name"; exit 1 ;;
     esac
   done < "$settings_file"
@@ -96,6 +97,19 @@ parse_config() {
     err "num_sites must be > 0 and <= 1,000,000"
     exit 1
   fi
+
+  if [ -n "$bs_args" ]; then
+    # validate BS commandline args
+    local bs_flag; for bs_flag in $bs_args; do
+      case "$bs_flag" in
+        --collect-and-clear-cookies) ;;
+        --no-gpc) ;;
+        --no-link-clicking) ;;
+        --take-screenshots) ;;
+        *) err "Unknown Badger Sett flag: $bs_flag"; exit 1; ;;
+      esac
+    done
+  fi
 }
 
 confirm_run() {
@@ -110,6 +124,7 @@ Starting distributed Badger Sett run:
   Droplets:     $num_crawlers $do_size in $do_region
   browser:      ${browser^}
   PB branch:    $pb_branch
+  BS args:      ${bs_args:-"none"}
 
 EOF
 
@@ -295,7 +310,7 @@ init_scan() {
     exclude="--exclude=$exclude"
   fi
   # TODO support configuring --load-extension
-  ssh_fn crawluser@"$droplet_ip" "BROWSER=$browser GIT_PUSH=0 RUN_BY_CRON=1 PB_BRANCH=$pb_branch nohup ./badger-sett/runscan.sh $chunk_size --no-blocking --domain-list ./domain-lists/domains.txt --exclude-failures-since=off $exclude </dev/null >runscan.out 2>&1 &"
+  ssh_fn crawluser@"$droplet_ip" "BROWSER=$browser GIT_PUSH=0 RUN_BY_CRON=1 PB_BRANCH=$pb_branch nohup ./badger-sett/runscan.sh $chunk_size --no-blocking --domain-list ./domain-lists/domains.txt --exclude-failures-since=off $exclude $bs_args </dev/null >runscan.out 2>&1 &"
   # TODO if Docker image fails to install (unknown layer in Dockerfile),
   # TODO we run into log.txt rsync errors as we fail to detect the scan actually failed/never started
   # TODO update scan_terminated() to be more robust? or, detect and handle when runscan.sh fails?
@@ -336,6 +351,11 @@ extract_results() {
     if ssh_fn crawluser@"$droplet_ip" '[ -d ./badger-sett/screenshots ]' 2>/dev/null; then
       mkdir -p "$results_folder"/screenshots
       rsync_fn crawluser@"$droplet_ip":badger-sett/screenshots/* "$results_folder"/screenshots
+    fi
+    # and cookies, if any
+    if ssh_fn crawluser@"$droplet_ip" '[ -d ./badger-sett/cookies ]' 2>/dev/null; then
+      mkdir -p "$results_folder"/cookies
+      rsync_fn crawluser@"$droplet_ip":badger-sett/cookies/* "$results_folder"/cookies
     fi
   else
     # extract Docker output log
@@ -555,7 +575,7 @@ main() {
   local do_ssh_key=
   local droplet_name_prefix=badger-sett-scanner-
   local pb_branch=master
-  local num_crawlers num_sites exclude_suffixes sitelist
+  local num_crawlers num_sites exclude_suffixes sitelist bs_args
   local bs_repo_dir pb_repo_dir
 
   # loop vars and misc.
